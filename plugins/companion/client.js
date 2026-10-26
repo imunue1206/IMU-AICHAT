@@ -284,7 +284,17 @@ window.__ModuleLoader__.load({
       if (minutes < 24 * 60) return `${Math.round(minutes / 60)} 小时后到`;
       return `${Math.round(minutes / (24 * 60))} 天后到`;
     };
-    const kindLabel = (kind) => (kind === 'express' ? '跑腿' : '快递');
+    const CHANNELS = [
+      ['takeout', '外卖', '她附近点的，20～60 分钟'],
+      ['courier', '快递', '从你这儿寄，按距离算'],
+      ['online', '网购', '下单寄给她，2～4 天'],
+    ];
+    const kindLabel = (kind) =>
+      kind === 'takeout' || kind === 'express'
+        ? '外卖'
+        : kind === 'online'
+          ? '网购'
+          : '快递';
 
     const sameDay = (a, b) => {
       const x = new Date(a);
@@ -1665,6 +1675,7 @@ window.__ModuleLoader__.load({
       const [showStickers, setShowStickers] = React.useState(false);
       const [showGifts, setShowGifts] = React.useState(false);
       const [giftText, setGiftText] = React.useState('');
+      const [giftChannel, setGiftChannel] = React.useState('courier');
 
       const since = React.useRef(0);
       const readRef = React.useRef(true);
@@ -1782,6 +1793,7 @@ window.__ModuleLoader__.load({
           const data = await api('send.item', {
             name: gift.name,
             emoji: gift.emoji,
+            channel: giftChannel,
             since: since.current,
           });
           absorb({ ...data, typing: false });
@@ -2188,6 +2200,27 @@ window.__ModuleLoader__.load({
           ? h(
               'div',
               { className: 'cmp-sticker-panel' },
+              h(
+                'div',
+                { className: 'cmp-chips', style: { gridColumn: '1 / -1', margin: 0 } },
+                CHANNELS.map(([value, label]) =>
+                  h(
+                    'button',
+                    {
+                      key: value,
+                      type: 'button',
+                      className: `cmp-chip${giftChannel === value ? ' on' : ''}`,
+                      onClick: () => setGiftChannel(value),
+                    },
+                    label,
+                  ),
+                ),
+                h(
+                  'span',
+                  { className: 'cmp-sticker-pick-text', style: { alignSelf: 'center' } },
+                  (CHANNELS.find((entry) => entry[0] === giftChannel) || CHANNELS[1])[2],
+                ),
+              ),
               GIFTS.map((gift) =>
                 h(
                   'button',

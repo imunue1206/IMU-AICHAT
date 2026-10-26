@@ -26,7 +26,6 @@ import {
   distanceBetween,
   parcelHours,
   describeDistance,
-  SAME_CITY_KM,
 } from './geo.js';
 import {
   candidatesPrompt,
@@ -220,15 +219,19 @@ export function apply(ctx) {
   }
 
   /**
-   * What kind of delivery this is decides how long it takes. Food and flowers
-   * are couriered across the same city; everything else goes by parcel post.
+   * Three ways a thing can reach someone:
+   *  - takeout: ordered from a shop near HER, so distance is irrelevant
+   *  - courier: mailed from your city, so distance is everything
+   *  - online: ordered from a warehouse, slow for everyone
    */
-  function deliveryKind(name, emoji) {
-    const expressWords = ['奶茶', '咖啡', '外卖', '草莓', '水果', '花', '蛋糕', '冰淇淋', '烧烤'];
-    const expressEmoji = ['🧋', '☕', '🍓', '🍰', '💐', '🍦', '🍜', '🍢'];
-    if (expressEmoji.includes(emoji)) return 'express';
-    if (expressWords.some((word) => String(name).includes(word))) return 'express';
-    return 'parcel';
+  const CHANNELS = ['takeout', 'courier', 'online'];
+
+  function guessChannel(name, emoji) {
+    const foodWords = ['奶茶', '咖啡', '外卖', '草莓', '水果', '花', '蛋糕', '冰淇淋', '烧烤', '饭'];
+    const foodEmoji = ['🧋', '☕', '🍓', '🍰', '💐', '🍦', '🍜', '🍢'];
+    if (foodEmoji.includes(emoji)) return 'takeout';
+    if (foodWords.some((word) => String(name).includes(word))) return 'takeout';
+    return 'courier';
   }
 
   /** Nobody rings your doorbell at four in the morning. */
@@ -244,17 +247,19 @@ export function apply(ctx) {
 
   const userCity = () => (root.user && root.user.city) || '';
 
-  function sendParcel(ch, from, name, emoji, cost) {
+  function sendParcel(ch, from, name, emoji, cost, requested) {
     const now = Date.now();
     const km = distanceBetween(ch.profile.city, userCity());
-    // A courier only makes sense inside one city; across cities it is post.
-    const sameCity = km !== null && km < SAME_CITY_KM;
-    const kind = deliveryKind(name, emoji) === 'express' && sameCity ? 'express' : 'parcel';
+    const channel = CHANNELS.includes(requested)
+      ? requested
+      : guessChannel(name, emoji);
     const raw =
-      kind === 'express'
+      channel === 'takeout'
         ? 20 * 60_000 + Math.random() * 40 * 60_000
-        : parcelHours(km) * 3600_000 * (0.8 + Math.random() * 0.4);
-    const arrivesAt = kind === 'express' ? now + raw : daytime(now + raw);
+        : channel === 'online'
+          ? 36 * 3600_000 + Math.random() * 60 * 3600_000
+          : parcelHours(km) * 3600_000 * (0.8 + Math.random() * 0.4);
+    const arrivesAt = channel === 'takeout' ? now + raw : daytime(now + raw);
     ch.parcels = Array.isArray(ch.parcels) ? ch.parcels : [];
     ch.parcels.push({
       id: `p${now.toString(36)}${Math.random().toString(36).slice(2, 5)}`,
@@ -262,8 +267,8 @@ export function apply(ctx) {
       emoji,
       from,
       cost: cost || 0,
-      kind,
-      km,
+      kind: channel,
+      km: channel === 'courier' ? km : null,
       sentAt: now,
       arrivesAt,
     });
@@ -284,6 +289,7 @@ export function apply(ctx) {
         parcel.emoji,
         '',
         parcel.cost,
+        parcel.kind,
       );
       // A ledger that outlives the chat window: this is the record he asked for.
       ch.giftLog = Array.isArray(ch.giftLog) ? ch.giftLog : [];
@@ -313,14 +319,14 @@ export function apply(ctx) {
     persist(true);
   }
 
-  function pushItem(ch, role, name, emoji, note, cost) {
+  function pushItem(ch, role, name, emoji, note, cost, channel) {
     ch.seq += 1;
     const message = {
       seq: ch.seq,
       role,
       kind: 'item',
       text: note || name,
-      item: { name, emoji: emoji || '🎁', note: note || '', cost: cost || 0 },
+      item: { name, emoji: emoji || '🎁', note: note || '', cost: cost || 0, channel: channel || '' },
       ts: Date.now(),
     };
     ch.messages.push(message);
@@ -481,7 +487,7 @@ export function apply(ctx) {
           : lastUser.kind === 'sticker'
             ? `（他发了个表情包：${lastUser.sticker.text || ''} ${lastUser.sticker.emoji}）`
             : lastUser.kind === 'item'
-              ? `（他寄的东西到了：${lastUser.item.emoji} ${lastUser.item.name}）`
+              ? `（${lastUser.item.channel === 'takeout' ? '他给你点的外卖到了' : '他寄的东西到了'}：${lastUser.item.emoji} ${lastUser.item.name}）`
               : lastUser.text;
     const { text } = await complete(system, prompt, 700, 0.95);
     return sanitize(text);
@@ -1296,7 +1302,7 @@ export function apply(ctx) {
           const emoji = String(body.emoji || '🎁').slice(0, 4);
           // Sending is private: it must not touch the conversation at all.
           // She only learns about it when the parcel arrives.
-          sendParcel(ch, 'him', name, emoji, 0);
+          sendParcel(ch, 'him', name, emoji, 0, body.channel);
           persist(true);
           return reply(res, 200, payload(Number(body.since) || 0, now));
         }
