@@ -9,6 +9,8 @@
  *    back to a hand-written skeleton, so the panel never dies on bad JSON.
  */
 
+import { coordsOf, CITIES } from './geo.js';
+
 const KINDS = new Set(['sleep', 'busy', 'free', 'rest']);
 
 /* ------------------------------------------------------------------ *
@@ -490,6 +492,7 @@ export function meetPrompt(brief, role, context = {}) {
       '- 用户会自己看着这些细节去猜她是什么人，那是他的乐趣。',
       '',
       '作息与档案的规则同前：weekday/weekend 覆盖 00:00 到 24:00，用紧凑数组，至少一段 sleep。',
+      'city 必须是中国真实存在的城市，不许虚构。',
       'temper 和 looks 不许写形容词，写她做过的事、身上的东西。',
     ].join('\n'),
     prompt: [
@@ -684,6 +687,7 @@ export function expandPrompt(seed, candidate, lifestyle, context = {}) {
       '- cost 是她花钱的时段（吃饭、买东西），earn 是有收入的时段（兼职、发工资），没有就不写。',
       '- note 必须是具体的细节，不要写「做自己的事」这种空话。',
       '- temper 和 looks 里不许出现形容词式的人设：写她做过的事、她身上的东西。',
+      '- city 必须是中国真实存在的城市（杭州、成都、武汉这种），不许虚构地名。',
       '- interludes 给 8 条，每条 15 字内，是她一天里会冒出来的小事。',
       '不要出现真实明星、真实公司、真实学校名。她不是 AI，就是个普通人。',
     ].join('\n'),
@@ -854,7 +858,11 @@ export function repairProfile(profile) {
       .filter(Boolean)
       .sort((a, b) => a.from - b.from);
   };
-  return { ...profile, weekday: fix(profile.weekday), weekend: fix(profile.weekend) };
+  return {
+    ...profile,
+    weekday: fix(profile.weekday),
+    weekend: fix(profile.weekend),
+  };
 }
 
 /**

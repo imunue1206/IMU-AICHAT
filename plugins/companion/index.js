@@ -1249,6 +1249,19 @@ export function apply(ctx) {
           return reply(res, 200, { ok: true, portrait: portraitPayload(), user: root.user });
         }
 
+        case 'profile.city': {
+          const target = root.characters.find((item) => item.id === body.id) || ch;
+          if (!target || !target.profile) return reply(res, 404, { ok: false, error: '没有这个人' });
+          const city = String(body.city || '').trim().slice(0, 20);
+          if (!city) return reply(res, 400, { ok: false, error: '城市不能为空' });
+          if (!CITIES.includes(city)) {
+            return reply(res, 400, { ok: false, error: `不认识的城：${city}。试试杭州、成都、武汉这种。` });
+          }
+          target.profile.city = city;
+          persist(true);
+          return reply(res, 200, payload(0, now));
+        }
+
         case 'travel.toggle': {
           if (!ch || !profileOf(ch)) return reply(res, 400, { ok: false, error: '先有一个人' });
           if (ch.travel) {

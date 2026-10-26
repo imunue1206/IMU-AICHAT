@@ -1670,6 +1670,7 @@ window.__ModuleLoader__.load({
       const [parcels, setParcels] = React.useState([]);
       const [weather, setWeather] = React.useState(null);
       const [distance, setDistance] = React.useState(null);
+      const [cityDraft, setCityDraft] = React.useState('');
       const [ready, setReady] = React.useState(false);
       const [view, setView] = React.useState('auto');
       const [text, setText] = React.useState('');
@@ -1849,6 +1850,9 @@ window.__ModuleLoader__.load({
             const data = await api('characters.new');
             setDraft(data.draft);
             setView('chat');
+          } else if (action === 'city') {
+            absorb(await api('profile.city', { city: id }), true);
+            setCityDraft('');
           } else if (action === 'travel') {
             absorb(await api('travel.toggle'), true);
           } else if (action === 'meet') {
@@ -2194,6 +2198,33 @@ window.__ModuleLoader__.load({
                   '她此刻在做什么、今天经历了什么，除非她说，你不会知道。',
                 ),
               ),
+              distance && distance.km === null
+                ? h(
+                    'div',
+                    { style: { marginTop: 10 } },
+                    h('div', { className: 'cmp-life-fact' }, '这个城市不在表里，改一个真实城市：'),
+                    h(
+                      'div',
+                      { style: { display: 'flex', gap: 8, marginTop: 6 } },
+                      h('input', {
+                        className: 'cmp-input',
+                        style: { height: 32, minHeight: 32, padding: '5px 9px', fontSize: 13 },
+                        value: cityDraft,
+                        placeholder: '例如 杭州',
+                        onChange: (event) => setCityDraft(event.target.value),
+                      }),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'cmp-mini',
+                          onClick: () => act('city', cityDraft),
+                        },
+                        '改',
+                      ),
+                    ),
+                  )
+                : null,
               h(
                 'button',
                 {
