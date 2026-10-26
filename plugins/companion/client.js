@@ -1606,6 +1606,7 @@ window.__ModuleLoader__.load({
       const [persona, setPersona] = React.useState(null);
       const [status, setStatus] = React.useState(null);
       const [messages, setMessages] = React.useState([]);
+      const messagesRef = React.useRef([]);
       const [typing, setTyping] = React.useState(false);
       const [error, setError] = React.useState(null);
       const [draft, setDraft] = React.useState(null);
@@ -1625,13 +1626,22 @@ window.__ModuleLoader__.load({
 
       const since = React.useRef(0);
       const readRef = React.useRef(true);
+      const stickRef = React.useRef(true);
+      const olderRef = React.useRef(false);
+      const hasMoreRef = React.useRef(true);
       const listRef = React.useRef(null);
       const inputRef = React.useRef(null);
+
+      React.useEffect(() => {
+        messagesRef.current = messages;
+      }, [messages]);
 
       const absorb = React.useCallback((data, reset = false) => {
         if (reset) {
           since.current = 0;
           setMessages([]);
+          hasMoreRef.current = true;
+          stickRef.current = true;
         }
         if (data.persona !== undefined) setPersona(data.persona);
         if (data.status !== undefined) setStatus(data.status);
@@ -1681,9 +1691,45 @@ window.__ModuleLoader__.load({
       }, [view, draft, roster.length]);
 
       React.useEffect(() => {
+        if (!stickRef.current) return;
         const el = listRef.current;
         if (el) el.scrollTop = el.scrollHeight;
       }, [messages.length, typing]);
+
+      const loadOlder = React.useCallback(async () => {
+        if (olderRef.current || !hasMoreRef.current) return;
+        const el = listRef.current;
+        if (!el || el.scrollTop > 80) return;
+        olderRef.current = true;
+        const previousHeight = el.scrollHeight;
+        const previousTop = el.scrollTop;
+        try {
+          const oldest = messagesRef.current[0];
+          if (!oldest) return;
+          const data = await api('messages.before', { seq: oldest.seq, limit: 40 });
+          hasMoreRef.current = data.messages.length === 40;
+          if (data.messages.length) {
+            setMessages((previous) => {
+              const known = new Set(previous.map((m) => m.seq));
+              return data.messages.filter((m) => !known.has(m.seq)).concat(previous);
+            });
+            requestAnimationFrame(() => {
+              const node = listRef.current;
+              if (node) node.scrollTop = node.scrollHeight - previousHeight + previousTop;
+            });
+          }
+        } catch {
+          /* ignore, the next scroll retries */
+        } finally {
+          olderRef.current = false;
+        }
+      }, []);
+
+      const onScroll = (event) => {
+        const el = event.currentTarget;
+        stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+        if (el.scrollTop < 80) void loadOlder();
+      };
 
       const sendGift = async (gift) => {
         setShowGifts(false);
@@ -2075,7 +2121,7 @@ window.__ModuleLoader__.load({
           : null,
         h(
           'div',
-          { className: 'cmp-list', ref: listRef },
+          { className: 'cmp-list', ref: listRef, onScroll },
           !messages.length
             ? h(
                 'div',

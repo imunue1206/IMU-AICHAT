@@ -200,7 +200,7 @@ export function apply(ctx) {
     ch.seq += 1;
     const message = { seq: ch.seq, role, kind: 'text', text, ts: Date.now() };
     ch.messages.push(message);
-    if (ch.messages.length > 500) ch.messages.splice(0, ch.messages.length - 500);
+    if (ch.messages.length > 3000) ch.messages.splice(0, ch.messages.length - 3000);
     if (role === 'her') {
       ch.meta.lastHerMessageAt = message.ts;
       if (/晚安|先睡|睡了|我先睡/.test(text)) ch.meta.saidGoodnightAt = message.ts;
@@ -280,7 +280,7 @@ export function apply(ctx) {
       ts: Date.now(),
     };
     ch.messages.push(message);
-    if (ch.messages.length > 500) ch.messages.splice(0, ch.messages.length - 500);
+    if (ch.messages.length > 3000) ch.messages.splice(0, ch.messages.length - 3000);
     if (role === 'her') ch.meta.lastHerMessageAt = message.ts;
     return message;
   }
@@ -296,7 +296,7 @@ export function apply(ctx) {
       ts: Date.now(),
     };
     ch.messages.push(message);
-    if (ch.messages.length > 500) ch.messages.splice(0, ch.messages.length - 500);
+    if (ch.messages.length > 3000) ch.messages.splice(0, ch.messages.length - 3000);
     if (role === 'her') ch.meta.lastHerMessageAt = message.ts;
     return message;
   }
@@ -1167,6 +1167,18 @@ export function apply(ctx) {
           if (!root.portrait.answers) root.portrait.answers = [];
           persist(true);
           return reply(res, 200, { ok: true, portrait: portraitPayload() });
+        }
+
+        case 'messages.before': {
+          if (!ch) return reply(res, 404, { ok: false, error: '没有这个人' });
+          const before = Number(body.seq) || Number.MAX_SAFE_INTEGER;
+          const limit = Math.min(120, Math.max(10, Number(body.limit) || 40));
+          const older = ch.messages.filter((message) => message.seq < before).slice(-limit);
+          return reply(res, 200, {
+            ok: true,
+            messages: older,
+            hasMore: older.length === limit,
+          });
         }
 
         case 'gifts.list': {
