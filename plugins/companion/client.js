@@ -23,13 +23,8 @@ window.__ModuleLoader__.load({
   letter-spacing:1px;overflow:hidden}
 .cmp-avatar.sm{width:26px;height:26px;font-size:11px;font-weight:500}
 .cmp-avatar img{width:100%;height:100%;object-fit:cover;display:block}
-.cmp-avatar-wrap{position:relative;flex:0 0 auto;display:flex}
-.cmp-presence.on{background:var(--dsw-alias-state-success-primary)}
-.cmp-presence.off{background:var(--dsw-alias-state-idle-primary)}
 .cmp-me-btn .cmp-avatar{width:34px;height:34px;font-size:13px}
 
-.cmp-presence{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;
-  border-radius:50%;border:2px solid var(--dsw-alias-bg-base)}
 .cmp-id{min-width:0}
 .cmp-name{font-size:15px;font-weight:600;line-height:1.3}
 .cmp-sub{font-size:12.5px;color:var(--dsw-alias-label-secondary);white-space:nowrap;
@@ -400,20 +395,17 @@ window.__ModuleLoader__.load({
       { emoji: '🧋', text: '奶茶' },
     ];
 
-    function Avatar({ persona, small, dot }) {
+    function Avatar({ persona, small }) {
       const [broken, setBroken] = React.useState(false);
       const cls = `cmp-avatar${small ? ' sm' : ''}`;
-      const inner =
-        persona.avatar && !broken
-          ? h('img', { src: persona.avatar, alt: persona.name, onError: () => setBroken(true) })
-          : persona.initial;
-      if (!dot) return h('div', { className: cls }, inner);
-      return h(
-        'div',
-        { className: 'cmp-avatar-wrap' },
-        h('div', { className: cls }, inner),
-        h('span', { className: `cmp-presence ${dot}` }),
-      );
+      if (persona.avatar && !broken) {
+        return h(
+          'div',
+          { className: cls },
+          h('img', { src: persona.avatar, alt: persona.name, onError: () => setBroken(true) }),
+        );
+      }
+      return h('div', { className: cls }, persona.initial);
     }
 
     async function squareDataUrl(file) {
@@ -1445,7 +1437,6 @@ window.__ModuleLoader__.load({
                   },
                   h(Avatar, {
                     persona: { name: entry.name, initial: entry.initial, avatar: entry.avatar },
-                    dot: entry.online ? 'on' : 'off',
                   }),
                   h(
                     'div',
@@ -2211,7 +2202,7 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'cmp-head' },
-          h(Avatar, { persona, dot: status && status.asleep ? 'off' : 'on' }),
+          h(Avatar, { persona }),
           h(
             'div',
             { className: 'cmp-id' },

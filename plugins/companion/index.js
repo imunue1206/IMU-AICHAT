@@ -18,6 +18,7 @@ import {
   sanitize,
   profileOf,
   currentCity,
+  transcriptLine,
   isQuestionLike,
   SILENCE,
   ITEM_MARK,
@@ -499,18 +500,86 @@ export function apply(ctx) {
     throw lastError;
   }
 
+  /** Rough token count: CJK ~1 each, everything else ~3.6 chars. */
+  function estimateTokens(text) {
+    let cjk = 0;
+    let other = 0;
+    for (const char of String(text)) {
+      if (/[\u3400-\u9fff\uf900-\ufaff]/.test(char)) cjk += 1;
+      else other += 1;
+    }
+    return Math.ceil(cjk * 1.05 + other / 3.6);
+  }
+
+  let cachedWindow = 0;
+  async function contextWindow() {
+    if (cachedWindow) return cachedWindow;
+    try {
+      const chosen = selection();
+      const info = await ctx.llm.resolveModelInfo(chosen.provider, chosen.model);
+      cachedWindow = (info && info.context && info.context.contextWindow) || 128000;
+    } catch {
+      cachedWindow = 128000;
+    }
+    return cachedWindow;
+  }
+
+  /**
+   * Everything she has ever said, newest first, until the window is full.
+   * Total recall until the context itself runs out; only then does the oldest
+   * conversation start to fade.
+   */
+  function pickHistory(messages, budgetTokens) {
+    let used = 0;
+    let start = messages.length;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const cost = estimateTokens(transcriptLine(messages[i])) + 8;
+      if (used + cost > budgetTokens) break;
+      used += cost;
+      start = i;
+    }
+    return { history: messages.slice(start), dropped: start };
+  }
+
   async function generate(ch, kind, options) {
     const parsedRules = readRules();
     const lastUserText = options.lastUserText || '';
+    const now = Date.now();
     const spoken = ch.messages.filter((message) => message.role === 'user').length;
     const mustReply =
       kind === 'initiate' ||
       spoken <= 1 ||
       isQuestionLike(lastUserText) ||
       (ch.meta.skipStreak || 0) >= 1;
-    const system = buildSystem(ch, Date.now(), {
+    const historyBase = {
       kind,
       ...options,
+      mustReply: undefined,
+      history: [],
+    };
+    const bare = buildSystem(ch, now, {
+      ...historyBase,
+      rules: parsedRules.append,
+      overrides: parsedRules.sections,
+      voice: voiceOf(ch.voice),
+      portrait: portraitForPrompt(),
+      weather: { her: weatherFor(currentCity(ch)), his: userCity() ? weatherFor(userCity()) : null },
+      distanceKm: distanceTo(ch),
+      hisCity: userCity(),
+    });
+    const windowSize = await contextWindow();
+    const budget = Math.max(1500, windowSize - 900 - estimateTokens(bare));
+    const pool =
+      kind === 'reply' && ch.messages.length && ch.messages[ch.messages.length - 1].role === 'user'
+        ? ch.messages.slice(0, -1)
+        : ch.messages.slice();
+    const picked = pickHistory(pool, budget);
+
+    const system = buildSystem(ch, now, {
+      kind,
+      ...options,
+      history: picked.history,
+      historyNote: picked.dropped > 0 ? '（更早的对话已经超出上下文，记不清了）' : '',
       mustReply,
       rules: parsedRules.append,
       overrides: parsedRules.sections,

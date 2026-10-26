@@ -470,23 +470,17 @@ const relationUser = (state) =>
     ? `他现在的处境：${state.relation.userState}。别假装懂，别讲大道理。`
     : '';
 
-function transcript(state, limit, dropLastUser) {
-  let list = state.messages.slice(-limit);
-  if (dropLastUser && list.length && list[list.length - 1].role === 'user') list = list.slice(0, -1);
-  return list
-    .map(
-      (m) =>
-        `${m.role === 'user' ? '他' : '你'}：${
-          m.kind === 'sticker'
-            ? `[表情包：${m.sticker.text || ''} ${m.sticker.emoji}]`
-            : m.kind === 'item'
-              ? m.role === 'user'
-                ? `[他送了你：${m.item.name} ${m.item.emoji || ''}]`
-                : `[你送了他：${m.item.name} ${m.item.emoji || ''}]`
-              : m.text
-        }`,
-    )
-    .join('\n');
+/** One line of transcript. Used for the whole history, not a window. */
+export function transcriptLine(m) {
+  const body =
+    m.kind === 'sticker'
+      ? `[表情包：${m.sticker.text || ''} ${m.sticker.emoji}]`
+      : m.kind === 'item'
+        ? m.role === 'user'
+          ? `[他送了你：${m.item.name} ${m.item.emoji || ''}]`
+          : `[你送了他：${m.item.name} ${m.item.emoji || ''}]`
+        : m.text;
+  return `${m.role === 'user' ? '他' : '你'}：${body}`;
 }
 
 export function buildSystem(state, now = Date.now(), options = {}) {
@@ -575,8 +569,11 @@ export function buildSystem(state, now = Date.now(), options = {}) {
       ? ['【你的底色】', voice.intro, ...voice.rules].filter(Boolean).join('\n')
       : '',
     rules ? '【她自己的规矩】（这部分优先于上面所有规则）\n' + rules : '',
-    '【最近的聊天记录】',
-    transcript(state, 16, kind === 'reply') || '（还没有记录）',
+    '【你们聊过的】',
+    options.historyNote || '',
+    options.history && options.history.length
+      ? options.history.map(transcriptLine).join('\n')
+      : '（还没有记录）',
   ]
     .filter((line) => line !== '')
     .join('\n');
