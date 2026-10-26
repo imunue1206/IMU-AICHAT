@@ -285,9 +285,9 @@ window.__ModuleLoader__.load({
       return `${Math.round(minutes / (24 * 60))} 天后到`;
     };
     const CHANNELS = [
-      ['takeout', '外卖', '她附近点的，20～60 分钟'],
-      ['courier', '快递', '从你这儿寄，按距离算'],
-      ['online', '网购', '下单寄给她，2～4 天'],
+      ['takeout', '外卖', '7～17 分钟', 7, 17, '分钟'],
+      ['courier', '快递', '6～36 小时', 6, 36, '小时'],
+      ['online', '网购', '8～28 小时', 8, 28, '小时'],
     ];
     const kindLabel = (kind) =>
       kind === 'takeout' || kind === 'express'
@@ -1667,6 +1667,7 @@ window.__ModuleLoader__.load({
       const [encounter, setEncounter] = React.useState(null);
       const [parcels, setParcels] = React.useState([]);
       const [weather, setWeather] = React.useState(null);
+      const [distance, setDistance] = React.useState(null);
       const [ready, setReady] = React.useState(false);
       const [view, setView] = React.useState('auto');
       const [text, setText] = React.useState('');
@@ -1676,6 +1677,7 @@ window.__ModuleLoader__.load({
       const [showGifts, setShowGifts] = React.useState(false);
       const [giftText, setGiftText] = React.useState('');
       const [giftChannel, setGiftChannel] = React.useState('courier');
+      const [giftEta, setGiftEta] = React.useState(18);
 
       const since = React.useRef(0);
       const readRef = React.useRef(true);
@@ -1705,6 +1707,7 @@ window.__ModuleLoader__.load({
         if (data.encounter !== undefined) setEncounter(data.encounter);
         if (Array.isArray(data.parcels)) setParcels(data.parcels);
         if (data.weather !== undefined) setWeather(data.weather);
+        if (data.distance !== undefined) setDistance(data.distance);
         setTyping(Boolean(data.typing));
         if (data.error !== undefined) setError(data.error);
         if (Array.isArray(data.messages) && data.messages.length) {
@@ -1794,6 +1797,7 @@ window.__ModuleLoader__.load({
             name: gift.name,
             emoji: gift.emoji,
             channel: giftChannel,
+            minutes: giftChannel === 'takeout' ? giftEta : giftEta * 60,
             since: since.current,
           });
           absorb({ ...data, typing: false });
@@ -2156,7 +2160,18 @@ window.__ModuleLoader__.load({
               h(
                 'div',
                 { className: 'cmp-life-now' },
-                `${status.dateLabel} · ${status.activity} · 小金库 ${status.cash} 元`,
+                [
+                  status.dateLabel,
+                  status.activity,
+                  `小金库 ${status.cash} 元`,
+                  distance && distance.km !== null
+                    ? `${distance.herCity} · 距你 ${distance.km} 公里`
+                    : distance
+                      ? distance.herCity
+                      : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
               ),
               h(
                 'div',

@@ -22,11 +22,7 @@ import {
   ITEM_MARK,
 } from './world.js';
 import { weatherFor, seasonOf } from './weather.js';
-import {
-  distanceBetween,
-  parcelHours,
-  describeDistance,
-} from './geo.js';
+import { distanceBetween, describeDistance } from './geo.js';
 import {
   candidatesPrompt,
   expandPrompt,
@@ -226,6 +222,25 @@ export function apply(ctx) {
    */
   const CHANNELS = ['takeout', 'courier', 'online'];
 
+  /** Fixed windows; the slider picks a point inside them. */
+  const CHANNEL_RANGES = {
+    takeout: { min: 7, max: 17, unit: 'minutes' },
+    courier: { min: 6, max: 36, unit: 'hours' },
+    online: { min: 8, max: 28, unit: 'hours' },
+  };
+
+  const clampEta = (channel, minutes) => {
+    const range = CHANNEL_RANGES[channel];
+    const unitMs = range.unit === 'hours' ? 3600_000 : 60_000;
+    const low = range.min * unitMs;
+    const high = range.max * unitMs;
+    const value = Number(minutes);
+    if (!Number.isFinite(value) || value <= 0) {
+      return (low + high) / 2;
+    }
+    return Math.min(high, Math.max(low, value * 60_000));
+  };
+
   function guessChannel(name, emoji) {
     const foodWords = ['奶茶', '咖啡', '外卖', '草莓', '水果', '花', '蛋糕', '冰淇淋', '烧烤', '饭'];
     const foodEmoji = ['🧋', '☕', '🍓', '🍰', '💐', '🍦', '🍜', '🍢'];
@@ -234,32 +249,17 @@ export function apply(ctx) {
     return 'courier';
   }
 
-  /** Nobody rings your doorbell at four in the morning. */
-  function daytime(ts) {
-    const date = new Date(ts);
-    const hour = date.getHours();
-    if (hour >= 8 && hour < 22) return ts;
-    const shifted = new Date(ts);
-    if (hour >= 22) shifted.setDate(shifted.getDate() + 1);
-    shifted.setHours(9, 30, 0, 0);
-    return shifted.getTime();
-  }
-
   const userCity = () => (root.user && root.user.city) || '';
 
-  function sendParcel(ch, from, name, emoji, cost, requested) {
+  function sendParcel(ch, from, name, emoji, cost, requested, minutes) {
     const now = Date.now();
-    const km = distanceBetween(ch.profile.city, userCity());
-    const channel = CHANNELS.includes(requested)
-      ? requested
-      : guessChannel(name, emoji);
-    const raw =
-      channel === 'takeout'
-        ? 20 * 60_000 + Math.random() * 40 * 60_000
-        : channel === 'online'
-          ? 36 * 3600_000 + Math.random() * 60 * 3600_000
-          : parcelHours(km) * 3600_000 * (0.8 + Math.random() * 0.4);
-    const arrivesAt = channel === 'takeout' ? now + raw : daytime(now + raw);
+    const channel = CHANNELS.includes(requested) ? requested : guessChannel(name, emoji);
+    const range = CHANNEL_RANGES[channel];
+    const unitMs = range.unit === 'hours' ? 3600_000 : 60_000;
+    const span = minutes === undefined
+      ? (range.min + Math.random() * (range.max - range.min)) * unitMs
+      : clampEta(channel, minutes);
+    const arrivesAt = now + span;
     ch.parcels = Array.isArray(ch.parcels) ? ch.parcels : [];
     ch.parcels.push({
       id: `p${now.toString(36)}${Math.random().toString(36).slice(2, 5)}`,
@@ -268,7 +268,6 @@ export function apply(ctx) {
       from,
       cost: cost || 0,
       kind: channel,
-      km: channel === 'courier' ? km : null,
       sentAt: now,
       arrivesAt,
     });
@@ -949,6 +948,13 @@ export function apply(ctx) {
       builtins: BUILTINS.map(({ id, name, blurb, voice }) => ({ id, name, blurb, voice })),
       draft: draftPayload(),
       encounter: profile && profile.encounter ? profile.encounter : null,
+      distance: profile
+        ? {
+            herCity: profile.city,
+            hisCity: userCity(),
+            km: distanceBetween(profile.city, userCity()),
+          }
+        : null,
       weather: (() => {
         const her = profile ? weatherFor(profile.city) : null;
         if (!her) return null;
@@ -964,7 +970,6 @@ export function apply(ctx) {
             emoji: parcel.emoji,
             from: parcel.from,
             kind: parcel.kind || 'parcel',
-            km: parcel.km === undefined ? null : parcel.km,
             minutes: Math.max(0, Math.round((parcel.arrivesAt - now) / 60_000)),
           }))
         : [],
@@ -1264,7 +1269,6 @@ export function apply(ctx) {
               emoji: parcel.emoji,
               from: parcel.from,
               kind: parcel.kind || 'parcel',
-              km: parcel.km === undefined ? null : parcel.km,
               minutes: Math.max(0, Math.round((parcel.arrivesAt - now) / 60_000)),
             })),
           });
@@ -1302,7 +1306,7 @@ export function apply(ctx) {
           const emoji = String(body.emoji || '🎁').slice(0, 4);
           // Sending is private: it must not touch the conversation at all.
           // She only learns about it when the parcel arrives.
-          sendParcel(ch, 'him', name, emoji, 0, body.channel);
+          sendParcel(ch, 'him', name, emoji, 0, body.channel, body.minutes);
           persist(true);
           return reply(res, 200, payload(Number(body.since) || 0, now));
         }
