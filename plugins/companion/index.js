@@ -208,11 +208,37 @@ export function apply(ctx) {
     return message;
   }
 
+  /**
+   * What kind of delivery this is decides how long it takes. Food and flowers
+   * are couriered across the same city; everything else goes by parcel post.
+   */
+  function deliveryKind(name, emoji) {
+    const expressWords = ['奶茶', '咖啡', '外卖', '草莓', '水果', '花', '蛋糕', '冰淇淋', '烧烤'];
+    const expressEmoji = ['🧋', '☕', '🍓', '🍰', '💐', '🍦', '🍜', '🍢'];
+    if (expressEmoji.includes(emoji)) return 'express';
+    if (expressWords.some((word) => String(name).includes(word))) return 'express';
+    return 'parcel';
+  }
+
+  /** Nobody rings your doorbell at four in the morning. */
+  function daytime(ts) {
+    const date = new Date(ts);
+    const hour = date.getHours();
+    if (hour >= 8 && hour < 22) return ts;
+    const shifted = new Date(ts);
+    if (hour >= 22) shifted.setDate(shifted.getDate() + 1);
+    shifted.setHours(9, 30, 0, 0);
+    return shifted.getTime();
+  }
+
   function sendParcel(ch, from, name, emoji, cost) {
     const now = Date.now();
-    // Her side is local and quick; what you mail has to actually travel.
-    const eta = from === 'her' ? 15 * 60_000 + Math.random() * 30 * 60_000
-      : 30 * 60_000 + Math.random() * 5.5 * 3600_000;
+    const kind = deliveryKind(name, emoji);
+    const raw =
+      kind === 'express'
+        ? 20 * 60_000 + Math.random() * 40 * 60_000
+        : 8 * 3600_000 + Math.random() * 64 * 3600_000;
+    const arrivesAt = kind === 'express' ? now + raw : daytime(now + raw);
     ch.parcels = Array.isArray(ch.parcels) ? ch.parcels : [];
     ch.parcels.push({
       id: `p${now.toString(36)}${Math.random().toString(36).slice(2, 5)}`,
@@ -220,8 +246,9 @@ export function apply(ctx) {
       emoji,
       from,
       cost: cost || 0,
+      kind,
       sentAt: now,
-      arrivesAt: now + eta,
+      arrivesAt,
     });
     if (ch.parcels.length > 40) ch.parcels.splice(0, ch.parcels.length - 40);
   }
@@ -1190,6 +1217,7 @@ export function apply(ctx) {
               name: parcel.name,
               emoji: parcel.emoji,
               from: parcel.from,
+              kind: parcel.kind || 'parcel',
               minutes: Math.max(0, Math.round((parcel.arrivesAt - now) / 60_000)),
             })),
           });

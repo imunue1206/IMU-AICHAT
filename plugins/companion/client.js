@@ -278,6 +278,14 @@ window.__ModuleLoader__.load({
       const d = new Date(ts);
       return `${d.getMonth() + 1}月${d.getDate()}日 ${clock(ts)}`;
     };
+    const etaLabel = (minutes) => {
+      if (minutes <= 0) return '快到了';
+      if (minutes < 60) return `${minutes} 分钟后到`;
+      if (minutes < 24 * 60) return `${Math.round(minutes / 60)} 小时后到`;
+      return `${Math.round(minutes / (24 * 60))} 天后到`;
+    };
+    const kindLabel = (kind) => (kind === 'express' ? '跑腿' : '快递');
+
     const sameDay = (a, b) => {
       const x = new Date(a);
       const y = new Date(b);
@@ -1369,13 +1377,9 @@ window.__ModuleLoader__.load({
                   h(
                     'div',
                     { className: 'cmp-gift-meta' },
-                    `${parcel.from === 'him' ? '你在寄' : '她在买'} · ${
-                      parcel.minutes <= 0
-                        ? '快到了'
-                        : parcel.minutes < 60
-                          ? `${parcel.minutes} 分钟后到`
-                          : `${Math.round(parcel.minutes / 60)} 小时后到`
-                    }`,
+                    `${parcel.from === 'him' ? '你在寄' : '她在买'} · ${kindLabel(
+                      parcel.kind,
+                    )} · ${etaLabel(parcel.minutes)}`,
                   ),
                 ),
               ),
@@ -1948,12 +1952,6 @@ window.__ModuleLoader__.load({
       }
 
       const sub = status ? `${status.status} · ${status.energyLabel} · ${status.timeLabel}` : '';
-      const eta = (minutes) =>
-        minutes <= 0
-          ? '快到了'
-          : minutes < 60
-            ? `${minutes} 分钟后到`
-            : `${Math.round(minutes / 60)} 小时后到`;
 
       const rows = [];
       if (encounter) {
@@ -2084,7 +2082,7 @@ window.__ModuleLoader__.load({
                 h(
                   'span',
                   { key: index, className: 'cmp-transit-item' },
-                  `${parcel.emoji} ${parcel.name} · ${parcel.from === 'him' ? '寄往她那' : '在路上'} · ${eta(parcel.minutes)}`,
+                  `${parcel.emoji} ${parcel.name} · ${parcel.from === 'him' ? '寄往她那' : '在路上'} · ${kindLabel(parcel.kind)} · ${etaLabel(parcel.minutes)}`,
                 ),
               ),
             )
