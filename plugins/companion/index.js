@@ -22,6 +22,12 @@ import {
   ITEM_MARK,
 } from './world.js';
 import {
+  distanceBetween,
+  parcelHours,
+  describeDistance,
+  SAME_CITY_KM,
+} from './geo.js';
+import {
   candidatesPrompt,
   expandPrompt,
   normalizeProfile,
@@ -231,13 +237,18 @@ export function apply(ctx) {
     return shifted.getTime();
   }
 
+  const userCity = () => (root.user && root.user.city) || '';
+
   function sendParcel(ch, from, name, emoji, cost) {
     const now = Date.now();
-    const kind = deliveryKind(name, emoji);
+    const km = distanceBetween(ch.profile.city, userCity());
+    // A courier only makes sense inside one city; across cities it is post.
+    const sameCity = km !== null && km < SAME_CITY_KM;
+    const kind = deliveryKind(name, emoji) === 'express' && sameCity ? 'express' : 'parcel';
     const raw =
       kind === 'express'
         ? 20 * 60_000 + Math.random() * 40 * 60_000
-        : 8 * 3600_000 + Math.random() * 64 * 3600_000;
+        : parcelHours(km) * 3600_000 * (0.8 + Math.random() * 0.4);
     const arrivesAt = kind === 'express' ? now + raw : daytime(now + raw);
     ch.parcels = Array.isArray(ch.parcels) ? ch.parcels : [];
     ch.parcels.push({
@@ -247,6 +258,7 @@ export function apply(ctx) {
       from,
       cost: cost || 0,
       kind,
+      km,
       sentAt: now,
       arrivesAt,
     });
@@ -448,6 +460,8 @@ export function apply(ctx) {
       overrides: parsedRules.sections,
       voice: voiceOf(ch.voice),
       portrait: portraitForPrompt(),
+      distanceKm: distanceBetween(ch.profile.city, userCity()),
+      hisCity: userCity(),
     });
     const lastUser = [...ch.messages].reverse().find((message) => message.role === 'user');
     const prompt =
@@ -925,6 +939,8 @@ export function apply(ctx) {
             name: parcel.name,
             emoji: parcel.emoji,
             from: parcel.from,
+            kind: parcel.kind || 'parcel',
+            km: parcel.km === undefined ? null : parcel.km,
             minutes: Math.max(0, Math.round((parcel.arrivesAt - now) / 60_000)),
           }))
         : [],
@@ -1127,7 +1143,7 @@ export function apply(ctx) {
         }
 
         case 'portrait.get':
-          return reply(res, 200, { ok: true, portrait: portraitPayload() });
+          return reply(res, 200, { ok: true, portrait: portraitPayload(), user: root.user });
 
         case 'portrait.answer': {
           const text = String(body.text || '').trim().slice(0, 1500);
@@ -1153,7 +1169,7 @@ export function apply(ctx) {
             persist(true);
             if (root.portrait.status === 'writing') void writePortrait();
             else void askNext();
-            return reply(res, 200, { ok: true, portrait: portraitPayload() });
+            return reply(res, 200, { ok: true, portrait: portraitPayload(), user: root.user });
           }
 
           const order =
@@ -1168,7 +1184,7 @@ export function apply(ctx) {
           if (root.portrait.status === 'writing') {
             void writePortrait();
           }
-          return reply(res, 200, { ok: true, portrait: portraitPayload() });
+          return reply(res, 200, { ok: true, portrait: portraitPayload(), user: root.user });
         }
 
         case 'portrait.start': {
@@ -1185,7 +1201,7 @@ export function apply(ctx) {
             updatedAt: Date.now(),
           };
           persist(true);
-          return reply(res, 200, { ok: true, portrait: portraitPayload() });
+          return reply(res, 200, { ok: true, portrait: portraitPayload(), user: root.user });
         }
 
         case 'portrait.save': {
@@ -1193,7 +1209,13 @@ export function apply(ctx) {
           root.portrait = { ...portrait(), summary, updatedAt: Date.now(), status: 'done' };
           if (!root.portrait.answers) root.portrait.answers = [];
           persist(true);
-          return reply(res, 200, { ok: true, portrait: portraitPayload() });
+          return reply(res, 200, { ok: true, portrait: portraitPayload(), user: root.user });
+        }
+
+        case 'user.set': {
+          root.user = { city: String(body.city || '').trim().slice(0, 20) };
+          persist(true);
+          return reply(res, 200, { ok: true, user: root.user });
         }
 
         case 'messages.before': {
@@ -1218,6 +1240,7 @@ export function apply(ctx) {
               emoji: parcel.emoji,
               from: parcel.from,
               kind: parcel.kind || 'parcel',
+              km: parcel.km === undefined ? null : parcel.km,
               minutes: Math.max(0, Math.round((parcel.arrivesAt - now) / 60_000)),
             })),
           });
@@ -1462,6 +1485,7 @@ function emptyRoot() {
     activeId: null,
     draft: null,
     portrait: null,
+    user: { city: '' },
   };
 }
 
@@ -1499,6 +1523,7 @@ function load(dir, file) {
       root.createdAt = raw.createdAt || Date.now();
       root.activeId = raw.activeId || null;
       root.draft = raw.draft || null;
+      root.user = raw.user || { city: '' };
       root.characters = raw.characters.map((entry) => {
         const base = createCharacter(entry.profile, entry.lockedAt || Date.now());
         let profile = repairProfile(entry.profile);

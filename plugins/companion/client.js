@@ -1044,11 +1044,13 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = React.useState(false);
       const [error, setError] = React.useState(null);
       const [status, setStatus] = React.useState('');
+      const [city, setCity] = React.useState('');
 
       const load = React.useCallback(async () => {
         try {
           const data = await api('portrait.get');
           setPortrait(data.portrait);
+          if (data.user) setCity(data.user.city || '');
           if (data.portrait.status !== 'asking') {
             setSummary((current) => current || data.portrait.summary || '');
           }
@@ -1107,6 +1109,12 @@ window.__ModuleLoader__.load({
           setPortrait(data.portrait);
           setText('');
           setSummary('');
+        });
+
+      const saveCity = () =>
+        run(async () => {
+          await api('user.set', { city });
+          setStatus('城市已保存');
         });
 
       const save = () =>
@@ -1256,6 +1264,34 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', className: 'cmp-pill', onClick: onBack }, '← 回去'),
           h('div', { className: 'cmp-name', style: { fontSize: 16 } }, '关于我'),
         ),
+        h('div', { className: 'cmp-field', style: { marginTop: 18 } }, '你在哪个城市'),
+        h(
+          'div',
+          { style: { display: 'flex', gap: 8 } },
+          h('input', {
+            className: 'cmp-input',
+            style: { height: 34, minHeight: 34, padding: '6px 10px' },
+            value: city,
+            placeholder: '例如 杭州',
+            onChange: (event) => setCity(event.target.value),
+          }),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'cmp-ghost',
+              style: { height: 34, padding: '0 14px' },
+              disabled: busy,
+              onClick: saveCity,
+            },
+            '保存',
+          ),
+        ),
+        h(
+          'p',
+          { className: 'cmp-hint' },
+          '这个位置决定你和她之间的距离——影响她寄东西要多久、以及她平时怎么跟你说话。',
+        ),
         ...body,
         error ? h('div', { className: 'cmp-err' }, error) : null,
       );
@@ -1379,7 +1415,7 @@ window.__ModuleLoader__.load({
                     { className: 'cmp-gift-meta' },
                     `${parcel.from === 'him' ? '你在寄' : '她在买'} · ${kindLabel(
                       parcel.kind,
-                    )} · ${etaLabel(parcel.minutes)}`,
+                    )}${parcel.km ? ` · ${parcel.km} 公里` : ''} · ${etaLabel(parcel.minutes)}`,
                   ),
                 ),
               ),
@@ -1465,6 +1501,7 @@ window.__ModuleLoader__.load({
       const [text, setText] = React.useState(null);
       const [path, setPath] = React.useState('');
       const [status, setStatus] = React.useState('');
+      const [city, setCity] = React.useState('');
       const [error, setError] = React.useState(null);
       const [saving, setSaving] = React.useState(false);
       const [busy, setBusy] = React.useState(false);
@@ -2082,7 +2119,9 @@ window.__ModuleLoader__.load({
                 h(
                   'span',
                   { key: index, className: 'cmp-transit-item' },
-                  `${parcel.emoji} ${parcel.name} · ${parcel.from === 'him' ? '寄往她那' : '在路上'} · ${kindLabel(parcel.kind)} · ${etaLabel(parcel.minutes)}`,
+                  `${parcel.emoji} ${parcel.name} · ${parcel.from === 'him' ? '寄往她那' : '在路上'} · ${kindLabel(parcel.kind)}${
+                    parcel.km ? ` · ${parcel.km} 公里` : ''
+                  } · ${etaLabel(parcel.minutes)}`,
                 ),
               ),
             )
