@@ -734,6 +734,8 @@ export function apply(ctx) {
         lastText: preview.slice(0, 80),
         lastMine: last ? last.role === 'user' : false,
         unread,
+        city: status.city,
+        travel: status.travel ? status.travel.kind : '',
         activity: status.status,
         asleep: status.asleep,
         met: Boolean(ch.met || (profile && profile.met)),

@@ -912,7 +912,7 @@ window.__ModuleLoader__.load({
                     h(
                       'div',
                       { className: 'cmp-sub' },
-                      entry.met ? entry.activity : entry.identity,
+                      entry.met ? entry.city : entry.identity,
                     ),
                     h(
                       'div',
@@ -1363,7 +1363,7 @@ window.__ModuleLoader__.load({
                         ? '已停用'
                         : entry.lastText
                           ? `${entry.lastMine ? '我：' : ''}${entry.lastText}`
-                          : entry.activity || '还没说过话',
+                          : entry.city || '还没说过话',
                     ),
                   ),
                   entry.unread
@@ -2010,16 +2010,8 @@ window.__ModuleLoader__.load({
         );
       }
 
-      const sub = status
-        ? [
-            status.status,
-            status.energyLabel,
-            status.timeLabel,
-            weather && weather.her ? `${weather.her.temp}°C ${weather.her.text}` : '',
-          ]
-            .filter(Boolean)
-            .join(' · ')
-        : '';
+      const sub =
+        weather && weather.her ? `${weather.her.temp}°C ${weather.her.text}` : '';
 
       const rows = [];
       if (encounter) {
@@ -2152,7 +2144,7 @@ window.__ModuleLoader__.load({
                 className: 'cmp-pill',
                 onClick: () => setShowLife((value) => !value),
               },
-              showLife ? tr('hideLife', '收起') : tr('showLife', '她的今天'),
+              showLife ? tr('hideLife', '收起') : tr('showLife', '她在哪'),
             ),
             h('button', { type: 'button', className: 'cmp-pill', onClick: () => setView('rules') }, '设定'),
           ),
@@ -2180,14 +2172,11 @@ window.__ModuleLoader__.load({
                 'div',
                 { className: 'cmp-life-now' },
                 [
-                  status.dateLabel,
-                  status.activity,
-                  `小金库 ${status.cash} 元`,
-                  distance && distance.km !== null
-                    ? `${distance.herCity} · 距你 ${distance.km} 公里`
-                    : distance
-                      ? distance.herCity
-                      : '',
+                  status.travel ? `${status.travel.kind} · ${status.travel.city}` : status.city,
+                  distance && distance.km !== null && distance.km !== undefined
+                    ? `距你 ${distance.km} 公里`
+                    : '',
+                  weather && weather.her ? `${weather.her.temp}°C ${weather.her.text}` : '',
                 ]
                   .filter(Boolean)
                   .join(' · '),
@@ -2195,28 +2184,18 @@ window.__ModuleLoader__.load({
               h(
                 'div',
                 null,
-                h('div', { className: 'cmp-life-fact' }, '她没说过的事，就还是不知道的。'),
+                h(
+                  'div',
+                  { className: 'cmp-life-fact' },
+                  '她此刻在做什么、今天经历了什么，除非她说，你不会知道。',
+                ),
               ),
-              h('div', { className: 'cmp-life-sep' }),
-              (status.today || []).length
-                ? status.today
-                    .slice()
-                    .reverse()
-                    .map((event, index) =>
-                      h(
-                        'div',
-                        { key: index, className: 'cmp-event' },
-                        h('span', { className: 'cmp-event-time' }, clock(event.ts)),
-                        h('span', null, event.text),
-                      ),
-                    )
-                : h('div', { className: 'cmp-event' }, '今天还没什么特别的事。'),
               h(
                 'button',
                 {
                   type: 'button',
                   className: 'cmp-mini',
-                  style: { marginTop: 8 },
+                  style: { marginTop: 10 },
                   onClick: () => act('travel'),
                 },
                 status && status.travel ? '让她回来' : '让她出趟门',
@@ -2231,15 +2210,12 @@ window.__ModuleLoader__.load({
                 'div',
                 { className: 'cmp-empty' },
                 h('div', null, `${persona.name}有自己的作息，回消息不一定快。`),
-                status ? h('div', null, `她现在${status.activity}，在${status.place}。`) : null,
+                h('div', null, '她愿意讲的时候，你才会知道她在做什么。'),
               )
             : null,
           rows,
         ),
         error ? h('div', { className: 'cmp-error' }, error) : null,
-        status && status.asleep
-          ? h('div', { className: 'cmp-note' }, tr('asleep', '她大概已经睡了，这会儿回得会很慢。'))
-          : null,
         showGifts
           ? h(
               'div',
