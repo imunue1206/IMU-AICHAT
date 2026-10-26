@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="知夏">
+  <rect width="64" height="64" rx="16" fill="#E58A5F"/>
+  <path d="M17 19.5A4.5 4.5 0 0 1 21.5 15h21a4.5 4.5 0 0 1 4.5 4.5v14a4.5 4.5 0 0 1-4.5 4.5H30.8l-8.1 7.2A1.2 1.2 0 0 1 21 44v-6h.5A4.5 4.5 0 0 1 17 33.5v-14Z" fill="#FFF7F2" opacity="0.96"/>
+  <circle cx="26.4" cy="26.7" r="2.2" fill="#E58A5F"/>
+  <circle cx="32" cy="26.7" r="2.2" fill="#E58A5F"/>
+  <circle cx="37.6" cy="26.7" r="2.2" fill="#E58A5F"/>
+  <path d="M40.5 44.5c2.6-1.2 4.4-3.4 4.9-6-1.9.5-3.7 1.9-4.6 3.7-.4.9-.4 1.6-.3 2.3Z" fill="#FFF7F2" opacity="0.75"/>
+</svg>
