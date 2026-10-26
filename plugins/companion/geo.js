@@ -48,6 +48,8 @@ const CITY_COORDS = {
   常州: [31.81, 119.97],
 };
 
+export const CITIES = Object.keys(CITY_COORDS);
+
 /** Strip a trailing 市/省 so "杭州市" still resolves. */
 function normalise(name) {
   return String(name || '')

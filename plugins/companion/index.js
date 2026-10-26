@@ -17,11 +17,13 @@ import {
   planReply,
   sanitize,
   profileOf,
+  currentCity,
   isQuestionLike,
   SILENCE,
   ITEM_MARK,
 } from './world.js';
 import { weatherFor, seasonOf } from './weather.js';
+import { CITIES } from './geo.js';
 import { distanceBetween, describeDistance } from './geo.js';
 import {
   candidatesPrompt,
@@ -174,7 +176,7 @@ export function apply(ctx) {
   const boot = Date.now();
   for (const ch of root.characters) {
     if (ch.status === 'locked') advance(ch, boot);
-    if (ch.profile && ch.profile.city) void weatherFor(ch.profile.city);
+    if (ch.profile && ch.profile.city) void weatherFor(currentCity(ch));
   }
   if (root.user && root.user.city) void weatherFor(root.user.city);
 
@@ -471,10 +473,10 @@ export function apply(ctx) {
       voice: voiceOf(ch.voice),
       portrait: portraitForPrompt(),
       weather: {
-        her: weatherFor(ch.profile.city),
+        her: weatherFor(currentCity(ch)),
         his: userCity() ? weatherFor(userCity()) : null,
       },
-      distanceKm: distanceBetween(ch.profile.city, userCity()),
+      distanceKm: distanceBetween(currentCity(ch), userCity()),
       hisCity: userCity(),
     });
     const lastUser = [...ch.messages].reverse().find((message) => message.role === 'user');
@@ -950,16 +952,16 @@ export function apply(ctx) {
       encounter: profile && profile.encounter ? profile.encounter : null,
       distance: profile
         ? {
-            herCity: profile.city,
+            herCity: currentCity(ch),
             hisCity: userCity(),
-            km: distanceBetween(profile.city, userCity()),
+            km: distanceBetween(currentCity(ch), userCity()),
           }
         : null,
       weather: (() => {
-        const her = profile ? weatherFor(profile.city) : null;
+        const her = profile ? weatherFor(currentCity(ch)) : null;
         if (!her) return null;
         return {
-          her: { city: profile.city, temp: her.temp, text: her.text },
+          her: { city: currentCity(ch), temp: her.temp, text: her.text },
           his: userCity() ? weatherFor(userCity()) : null,
           season: her.season,
         };
@@ -1239,6 +1241,25 @@ export function apply(ctx) {
           if (!root.portrait.answers) root.portrait.answers = [];
           persist(true);
           return reply(res, 200, { ok: true, portrait: portraitPayload(), user: root.user });
+        }
+
+        case 'travel.toggle': {
+          if (!ch || !profileOf(ch)) return reply(res, 400, { ok: false, error: '先有一个人' });
+          if (ch.travel) {
+            ch.travel = null;
+            return reply(res, 200, payload(0, now));
+          }
+          const home = ch.profile.city;
+          const options = CITIES.filter((city) => city !== home);
+          const kinds = ['work', 'home', 'trip'];
+          ch.travel = {
+            kind: kinds[Math.floor(Math.random() * kinds.length)],
+            city: options[Math.floor(Math.random() * options.length)] || home,
+            startedAt: now,
+            endsAt: now + (1 + Math.floor(Math.random() * 3)) * 86400000,
+          };
+          persist(true);
+          return reply(res, 200, payload(0, now));
         }
 
         case 'user.set': {

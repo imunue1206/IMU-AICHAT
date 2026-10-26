@@ -27,6 +27,8 @@ window.__ModuleLoader__.load({
 .cmp-name{font-size:15px;font-weight:600;line-height:1.3}
 .cmp-sub{font-size:12.5px;color:var(--dsw-alias-label-secondary);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
+.cmp-place{font-size:11.5px;color:var(--dsw-alias-label-secondary);margin-left:8px;
+  white-space:nowrap}
 .cmp-toggles{margin-left:auto;display:flex;gap:8px;flex:0 0 auto;align-items:center}
 .cmp-pill{font-size:12px;padding:5px 11px;border-radius:999px;
   border:1px solid var(--dsw-alias-border-l1);background:transparent;
@@ -1847,6 +1849,8 @@ window.__ModuleLoader__.load({
             const data = await api('characters.new');
             setDraft(data.draft);
             setView('chat');
+          } else if (action === 'travel') {
+            absorb(await api('travel.toggle'), true);
           } else if (action === 'meet') {
             const data = await api('characters.meet');
             absorb(data, true);
@@ -2106,7 +2110,22 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'cmp-id' },
-            h('div', { className: 'cmp-name' }, persona.name),
+            h(
+              'div',
+              { className: 'cmp-name' },
+              persona.name,
+              status && status.travel
+                ? h('span', { className: 'cmp-place' }, `${status.travel.kind} · ${status.travel.city}`)
+                : distance && distance.herCity
+                  ? h(
+                      'span',
+                      { className: 'cmp-place' },
+                      distance.km !== null && distance.km !== undefined
+                        ? `${distance.herCity} · 距你 ${distance.km} 公里`
+                        : distance.herCity,
+                    )
+                  : null,
+            ),
             h('div', { className: 'cmp-sub' }, sub),
           ),
           h(
@@ -2192,6 +2211,16 @@ window.__ModuleLoader__.load({
                       ),
                     )
                 : h('div', { className: 'cmp-event' }, '今天还没什么特别的事。'),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'cmp-mini',
+                  style: { marginTop: 8 },
+                  onClick: () => act('travel'),
+                },
+                status && status.travel ? '让她回来' : '让她出趟门',
+              ),
             )
           : null,
         h(

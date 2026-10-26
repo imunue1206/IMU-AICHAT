@@ -7,7 +7,7 @@
  */
 
 import { DEFAULT_PROFILE } from './character.js';
-import { describeDistance } from './geo.js';
+import { describeDistance, CITIES } from './geo.js';
 import { weatherFor, seasonOf } from './weather.js';
 
 const MINUTE = 60_000;
@@ -111,6 +111,48 @@ const SEASON_EVENTS = {
   冬: ['手一直插在口袋里', '屋里暖气还没来', '四点多天就黑了'],
 };
 
+const TRAVEL_KINDS = [
+  { id: 'work', label: '出差', where: '酒店', words: ['到酒店了，房间小得转不开身', '一整天在客户那开会'] },
+  { id: 'home', label: '回老家', where: '老家', words: ['到家了，我妈在厨房喊我吃饭', '被亲戚问了三遍工作'] },
+  { id: 'trip', label: '出去玩', where: '民宿', words: ['民宿的床太软了', '在街上乱走，走到脚疼'] },
+];
+
+/** The city she is actually in right now, trip included. */
+export function currentCity(state, now = Date.now()) {
+  const trip = state && state.travel;
+  if (trip && trip.city && now < trip.endsAt) return trip.city;
+  return (state && state.profile && state.profile.city) || '';
+}
+
+/** Once a day: end a trip that ran out, or occasionally start a new one. */
+function maybeTravel(state, ts) {
+  const day = new Date(ts).toDateString();
+  if (!state.meta) return;
+  if (state.meta.lastTravelDay === day) return;
+  state.meta.lastTravelDay = day;
+
+  if (state.travel) {
+    if (ts >= state.travel.endsAt) {
+      state.travel = null;
+      pushEvent(state, ts, `回到${state.profile.city}了，累得不想说话`);
+    }
+    return;
+  }
+  if (Math.random() > 0.07) return;
+  const home = state.profile.city;
+  const options = CITIES.filter((city) => city !== home);
+  if (!options.length) return;
+  const kind = TRAVEL_KINDS[Math.floor(Math.random() * TRAVEL_KINDS.length)];
+  const city = options[Math.floor(Math.random() * options.length)];
+  const days = 1 + Math.floor(Math.random() * 3);
+  state.travel = { kind: kind.id, city, startedAt: ts, endsAt: ts + days * 86400000 };
+  pushEvent(state, ts, `订了去${city}的票，${kind.label}，${days}天`);
+}
+
+export function travelActive(state, now = Date.now()) {
+  return Boolean(state && state.travel && now < state.travel.endsAt);
+}
+
 const WEATHER_EVENTS = {
   rain: ['出门忘带伞，跑回来拿', '裤脚湿了半截', '雨停了一会儿又下起来'],
   cold: ['今天加了件外套，还是冷', '手冻得握不住手机', '风一吹，脖子缩进衣领里'],
@@ -144,6 +186,7 @@ export function seasonEventFor(season, minutesAgo = 0) {
 
 function onSlotStart(state, ts, entry, previous) {
   const profile = profileOf(state);
+  if (profile) maybeTravel(state, ts);
   if (previous && previous.earn) {
     state.life.cash += previous.earn;
     pushLedger(state, ts, previous.earn, previous.doing);
@@ -246,12 +289,16 @@ export function describe(state, now = Date.now()) {
     };
   }
   const entry = slotAt(profile, now);
+  const travelling = travelActive(state, now) ? state.travel : null;
+  const trip = travelling ? TRAVEL_KINDS.find((item) => item.id === travelling.kind) : null;
   return {
     now,
     dateLabel: `${WEEKDAYS[d.getDay()]} ${d.getMonth() + 1}月${d.getDate()}日`,
     timeLabel: hhmm(now),
     activity: entry.doing,
-    place: entry.where,
+    place: trip ? trip.where : entry.where,
+    city: travelling ? travelling.city : profile.city,
+    travel: travelling ? { kind: trip ? trip.label : '出门', city: travelling.city } : null,
     status: `${entry.doing} · ${entry.where}`,
     energy: Math.round(state.life.energy),
     energyLabel: energyLabel(state.life.energy),
@@ -471,6 +518,11 @@ export function buildSystem(state, now = Date.now(), options = {}) {
     distanceLine(profile, distanceKm, hisCity),
     weatherLine(profile, weather),
     `【时令】现在是 ${new Date(now).getMonth() + 1} 月，${seasonOf(new Date(now))}。`,
+    travelActive(state, now) && state.travel
+      ? `【你不在家】你这两天在${state.travel.city}${
+          (TRAVEL_KINDS.find((item) => item.id === state.travel.kind) || {}).label || '出门'
+        }，住${(TRAVEL_KINDS.find((item) => item.id === state.travel.kind) || {}).where || '外面'}，还没回去。`
+      : '',
     state.profile.encounter
       ? `【你们怎么认识的】${state.profile.encounter.when}，${state.profile.encounter.where}。${state.profile.encounter.moment}`
       : '',
