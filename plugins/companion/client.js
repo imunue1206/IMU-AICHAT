@@ -1656,6 +1656,7 @@ window.__ModuleLoader__.load({
       const [trial, setTrial] = React.useState(null);
       const [encounter, setEncounter] = React.useState(null);
       const [parcels, setParcels] = React.useState([]);
+      const [weather, setWeather] = React.useState(null);
       const [ready, setReady] = React.useState(false);
       const [view, setView] = React.useState('auto');
       const [text, setText] = React.useState('');
@@ -1692,6 +1693,7 @@ window.__ModuleLoader__.load({
         if (data.trial !== undefined) setTrial(data.trial ? data.trialDays : null);
         if (data.encounter !== undefined) setEncounter(data.encounter);
         if (Array.isArray(data.parcels)) setParcels(data.parcels);
+        if (data.weather !== undefined) setWeather(data.weather);
         setTyping(Boolean(data.typing));
         if (data.error !== undefined) setError(data.error);
         if (Array.isArray(data.messages) && data.messages.length) {
@@ -1988,7 +1990,16 @@ window.__ModuleLoader__.load({
         );
       }
 
-      const sub = status ? `${status.status} · ${status.energyLabel} · ${status.timeLabel}` : '';
+      const sub = status
+        ? [
+            status.status,
+            status.energyLabel,
+            status.timeLabel,
+            weather && weather.her ? `${weather.her.temp}°C ${weather.her.text}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : '';
 
       const rows = [];
       if (encounter) {

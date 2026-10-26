@@ -341,6 +341,13 @@ function distanceLine(profile, km, hisCity) {
   return `【你们之间】你在${profile.city}，他在${hisCity || '另一个城市'}，${describeDistance(km)}。`;
 }
 
+function weatherLine(profile, weather) {
+  if (!weather || !weather.her) return '';
+  const parts = [`你在${profile.city}，${weather.her.temp}°C，${weather.her.text}`];
+  if (weather.his) parts.push(`他在${weather.his.city}，${weather.his.temp}°C，${weather.his.text}`);
+  return `【天气】${parts.join('；')}。现在是${weather.her.season}天。`;
+}
+
 const ROLE_LINE = {
   mirror: '你们处境相近，说话不用铺垫。抱怨可以说，软的地方先不说。',
   deep: '你话不多，也不急着填满沉默。自己的事要等熟了才说，现在还不是时候。',
@@ -396,6 +403,7 @@ export function buildSystem(state, now = Date.now(), options = {}) {
     mustReply = false,
     distanceKm = null,
     hisCity = '',
+    weather = null,
   } = options;
   const d = describe(state, now);
   const today = d.today.map((event) => `  ${hhmm(event.ts)} ${event.text}`).join('\n') || '  （今天还没什么特别的事）';
@@ -415,6 +423,7 @@ export function buildSystem(state, now = Date.now(), options = {}) {
     profile.worry ? `你最近心里搁着一件事：${profile.worry}` : '',
     '',
     distanceLine(profile, distanceKm, hisCity),
+    weatherLine(profile, weather),
     state.profile.encounter
       ? `【你们怎么认识的】${state.profile.encounter.when}，${state.profile.encounter.where}。${state.profile.encounter.moment}`
       : '',

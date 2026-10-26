@@ -1,6 +1,6 @@
 {
   "name": "@local/companion",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "description": "一个有自己现实生活的陪伴者：她有自己的作息、住处、小金库和今天，聊天只是她生活漏到你这边的那部分。",
@@ -15,6 +15,7 @@
     "world.js",
     "character.js",
     "geo.js",
+    "weather.js",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",

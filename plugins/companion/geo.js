@@ -55,7 +55,7 @@ function normalise(name) {
     .replace(/[市省]$/u, '');
 }
 
-function coordsOf(name) {
+export function coordsOf(name) {
   return CITY_COORDS[normalise(name)] || null;
 }
 

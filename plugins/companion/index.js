@@ -21,6 +21,7 @@ import {
   SILENCE,
   ITEM_MARK,
 } from './world.js';
+import { weatherFor, seasonOf } from './weather.js';
 import {
   distanceBetween,
   parcelHours,
@@ -176,7 +177,11 @@ export function apply(ctx) {
   }
 
   const boot = Date.now();
-  for (const ch of root.characters) if (ch.status === 'locked') advance(ch, boot);
+  for (const ch of root.characters) {
+    if (ch.status === 'locked') advance(ch, boot);
+    if (ch.profile && ch.profile.city) void weatherFor(ch.profile.city);
+  }
+  if (root.user && root.user.city) void weatherFor(root.user.city);
 
   const active = () => root.characters.find((ch) => ch.id === root.activeId) || null;
 
@@ -460,6 +465,10 @@ export function apply(ctx) {
       overrides: parsedRules.sections,
       voice: voiceOf(ch.voice),
       portrait: portraitForPrompt(),
+      weather: {
+        her: weatherFor(ch.profile.city),
+        his: userCity() ? weatherFor(userCity()) : null,
+      },
       distanceKm: distanceBetween(ch.profile.city, userCity()),
       hisCity: userCity(),
     });
@@ -934,6 +943,15 @@ export function apply(ctx) {
       builtins: BUILTINS.map(({ id, name, blurb, voice }) => ({ id, name, blurb, voice })),
       draft: draftPayload(),
       encounter: profile && profile.encounter ? profile.encounter : null,
+      weather: (() => {
+        const her = profile ? weatherFor(profile.city) : null;
+        if (!her) return null;
+        return {
+          her: { city: profile.city, temp: her.temp, text: her.text },
+          his: userCity() ? weatherFor(userCity()) : null,
+          season: her.season,
+        };
+      })(),
       parcels: ch && Array.isArray(ch.parcels)
         ? ch.parcels.map((parcel) => ({
             name: parcel.name,
