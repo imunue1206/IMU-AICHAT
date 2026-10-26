@@ -734,22 +734,26 @@ export function apply(ctx) {
 
   /** After a long quiet stretch she may have something to say on her own. */
   /** Every ten messages or so, she takes stock of how things stand. */
-  async function reviewBond(ch) {
+  async function reviewBond(ch, first = false) {
     if (bonding.has(ch.id)) return;
     bonding.add(ch.id);
     try {
       const previous = ch.bond || { familiarity: 0.12, warmth: 0.5, trust: 0.08, note: '' };
-      const recent = ch.messages.slice(-40).map(transcriptLine).join('\n');
-      const { system, prompt } = bondPrompt(recent, previous, ch.profile);
+      // The first pass reads deep into the backlog so an existing relationship
+      // is not reset to "strangers".
+      const window = first ? 120 : 40;
+      const recent = ch.messages.slice(-window).map(transcriptLine).join('\n');
+      const { system, prompt } = bondPrompt(recent, previous, ch.profile, first);
       const result = await completeWithin(system, prompt, [900, 600], 0.4, 'low');
       const raw = extractJson(result.text);
       if (!raw || typeof raw !== 'object') return;
+      const limit = first ? 1 : 0.15;
       const clamp = (value, fallback, floor) => {
         const n = Number(value);
         if (!Number.isFinite(n)) return fallback;
         const bounded = Math.min(1, Math.max(floor, n));
         const delta = bounded - fallback;
-        return fallback + Math.max(-0.15, Math.min(0.15, delta));
+        return fallback + Math.max(-limit, Math.min(limit, delta));
       };
       ch.bond = {
         familiarity: clamp(raw.familiarity, previous.familiarity, previous.familiarity),
@@ -1705,7 +1709,10 @@ export function apply(ctx) {
         void pump(character);
         maybeInitiate(character, now);
         const seen = (character.bond && character.bond.count) || 0;
-        if (character.messages.length - seen >= 10) void reviewBond(character);
+        const firstLook = !(character.bond && character.bond.updatedAt);
+        if (firstLook ? character.messages.length >= 6 : character.messages.length - seen >= 10) {
+          void reviewBond(character, firstLook);
+        }
       }
       persist();
     }, TICK_MS);

@@ -367,7 +367,7 @@ export function nextQuestionPrompt(answers, asked, max) {
  * How the relationship stands, read from the recent conversation. Runs now and
  * then, not per message: feelings are something you notice afterwards.
  */
-export function bondPrompt(transcript, previous, profile) {
+export function bondPrompt(transcript, previous, profile, first = false) {
   return {
     system: [
       '你是一个关系观察者。读一段两个人的聊天，判断他们此刻的关系走到了哪里。',
@@ -381,13 +381,17 @@ export function bondPrompt(transcript, previous, profile) {
       '重要：**送礼物、说好听的话，都不算涨信任。** 只有这些才算：他讲了真心话并被接住；',
       '她讲了自己的事而他没有评价；他记住了某件小事并兑现。',
       '不要把礼貌当亲密，也不要因为对话简短就大幅下调。',
-      '除非发生了明显的事，否则三个值的变化幅度不要超过 0.15。',
+      first
+        ? '这是第一次判断：没有上一次可以参照。直接根据这段对话给出绝对值，不要保守。'
+        : '除非发生了明显的事，否则三个值的变化幅度不要超过 0.15。',
       '- note：一句话，20 到 40 字，说清你们现在是什么状态，要带一个具体的证据，不要客套。',
       `- 她叫${profile.name}，${profile.age}岁，${profile.identity}。`,
     ].join('\n'),
     prompt: [
-      `上一次的判断：familiarity ${previous.familiarity.toFixed(2)}，warmth ${previous.warmth.toFixed(2)}，trust ${previous.trust.toFixed(2)}`,
-      previous.note ? `上次的一句话：${previous.note}` : '',
+      first
+        ? '这是第一次判断。'
+        : `上一次的判断：familiarity ${previous.familiarity.toFixed(2)}，warmth ${previous.warmth.toFixed(2)}，trust ${previous.trust.toFixed(2)}`,
+      !first && previous.note ? `上次的一句话：${previous.note}` : '',
       '',
       '最近的对话：',
       transcript || '（还没有对话）',
