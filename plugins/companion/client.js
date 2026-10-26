@@ -213,7 +213,13 @@ window.__ModuleLoader__.load({
   padding:12px 18px;border:none;border-bottom:1px solid var(--dsw-alias-border-l1);
   background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:left}
 .cmp-conv:hover{background:var(--dsw-alias-bg-layer-1)}
-.cmp-me{border-bottom:1px solid var(--dsw-alias-border-l2)}
+.cmp-tabbar{flex:0 0 auto;display:flex;border-top:1px solid var(--dsw-alias-border-l1);
+  background:var(--dsw-alias-bg-layer-1)}
+.cmp-tab{flex:1 1 50%;padding:11px 0;border:none;background:transparent;
+  color:var(--dsw-alias-label-secondary);font:inherit;font-size:13px;cursor:pointer;
+  text-align:center}
+.cmp-tab.on{color:var(--dsw-alias-label-primary);font-weight:600}
+.cmp-tab:not(.on):hover{color:var(--dsw-alias-label-primary)}
 .cmp-conv.on{background:var(--dsw-alias-bg-layer-2)}
 .cmp-conv-main{flex:1 1 auto;min-width:0}
 .cmp-conv-top{display:flex;align-items:baseline;gap:8px}
@@ -1404,30 +1410,6 @@ window.__ModuleLoader__.load({
             h('button', { type: 'button', className: 'cmp-pill', onClick: onMore }, '管理'),
           ),
         ),
-        h(
-          'button',
-          { type: 'button', className: 'cmp-conv cmp-me', onClick: onPortrait },
-          h(Avatar, {
-            persona: { name: '我', initial: '我', avatar: me ? me.avatar : null },
-          }),
-          h(
-            'div',
-            { className: 'cmp-conv-main' },
-            h(
-              'div',
-              { className: 'cmp-conv-top' },
-              h('span', { className: 'cmp-conv-name' }, '我'),
-              h('span', { className: 'cmp-conv-time' }, '关于我'),
-            ),
-            h(
-              'div',
-              { className: 'cmp-conv-preview' },
-              me && me.cityLabel
-                ? `${me.cityLabel} · 头像、画像、语气规则、你在哪`
-                : '头像、画像、语气规则、你在哪',
-            ),
-          ),
-        ),
         roster.length === 0
           ? h('div', { className: 'cmp-conv-empty' }, '还没有人。点右上角「新写一个」。')
           : h(
@@ -1470,6 +1452,12 @@ window.__ModuleLoader__.load({
                 ),
               ),
             ),
+        h(
+          'div',
+          { className: 'cmp-tabbar' },
+          h('div', { className: 'cmp-tab on' }, '对话'),
+          h('button', { type: 'button', className: 'cmp-tab', onClick: onPortrait }, '我'),
+        ),
       );
     }
 
