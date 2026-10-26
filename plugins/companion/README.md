@@ -28,6 +28,10 @@ plugin_manager install_bundle  target = <这个目录的绝对路径>
 `state.json` 里有个 `version`，是**数据结构版本**，和 `package.json` 的版本号不是一回事。
 结构变了要写迁移，旧存档才读得出来。
 
+## 原则
+
+见 [PRINCIPLES.md](./PRINCIPLES.md)。那是验收标准：每加一个功能拿它过一遍。
+
 ## 功能地图
 
 - **对话列表**：头像、最后一条、未读；点进去聊天，左上角返回。

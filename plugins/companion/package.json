@@ -19,7 +19,10 @@
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg"
+    "icon.svg",
+    "README.md",
+    "PRINCIPLES.md",
+    "CHANGELOG.md"
   ],
   "dsh": {
     "bundle": {
