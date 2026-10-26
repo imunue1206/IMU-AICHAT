@@ -151,6 +151,22 @@ window.__ModuleLoader__.load({
 .cmp-err{color:var(--dsw-alias-state-error-primary);font-size:12.5px;margin:12px 0}
 .cmp-hint{font-size:12px;color:var(--dsw-alias-label-secondary);margin-top:10px;line-height:1.7}
 .cmp-field{font-size:12.5px;color:var(--dsw-alias-label-secondary);margin:16px 0 8px}
+.cmp-gift{display:flex;gap:10px;align-items:center;width:100%;box-sizing:border-box;
+  padding:11px 14px;margin-bottom:8px;border-radius:11px;text-align:left;
+  border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);
+  color:inherit;font:inherit;cursor:pointer}
+.cmp-gift:hover{border-color:var(--dsw-alias-border-l2)}
+.cmp-gift-emoji{font-size:22px;flex:0 0 auto}
+.cmp-gift-main{flex:1 1 auto;min-width:0}
+.cmp-gift-name{font-size:13.5px;font-weight:600}
+.cmp-gift-meta{font-size:11.5px;color:var(--dsw-alias-label-secondary);margin-top:2px}
+.cmp-gift-ctx{margin:-4px 0 12px;padding:10px 14px;border-radius:0 0 11px 11px;
+  background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l1);
+  border-top:none}
+.cmp-ctx-line{font-size:12.5px;color:var(--dsw-alias-label-secondary);padding:3px 0;
+  display:flex;gap:8px}
+.cmp-ctx-who{flex:0 0 auto;color:var(--dsw-alias-state-idle-primary);font-variant-numeric:tabular-nums}
+.cmp-ctx-line.focus .cmp-ctx-body{color:var(--dsw-alias-brand-primary)}
 .cmp-transit{flex:0 0 auto;display:flex;gap:14px;flex-wrap:wrap;padding:7px 20px;
   font-size:12px;color:var(--dsw-alias-label-secondary);
   background:var(--dsw-alias-bg-layer-1);border-bottom:1px solid var(--dsw-alias-border-l1)}
@@ -1307,6 +1323,140 @@ window.__ModuleLoader__.load({
      * Rules
      * -------------------------------------------------------------- */
 
+    function GiftsPage({ onBack }) {
+      const [data, setData] = React.useState(null);
+      const [open, setOpen] = React.useState(null);
+      const [context, setContext] = React.useState({});
+      const [error, setError] = React.useState(null);
+
+      React.useEffect(() => {
+        api('gifts.list')
+          .then((payload) => setData(payload))
+          .catch((cause) => setError(String(cause?.message || cause)));
+      }, []);
+
+      const toggle = async (gift) => {
+        if (open === gift.seq) {
+          setOpen(null);
+          return;
+        }
+        setOpen(gift.seq);
+        if (context[gift.seq]) return;
+        try {
+          const payload = await api('gifts.context', { seq: gift.seq });
+          setContext((current) => ({ ...current, [gift.seq]: payload }));
+        } catch (cause) {
+          setError(String(cause?.message || cause));
+        }
+      };
+
+      const body = [];
+      if (!data) {
+        body.push(h('p', { className: 'cmp-hint' }, '正在读…'));
+      } else {
+        if (data.parcels.length) {
+          body.push(h('div', { className: 'cmp-field', style: { marginTop: 0 } }, '在途'));
+          for (const parcel of data.parcels) {
+            body.push(
+              h(
+                'div',
+                { key: `p-${parcel.name}`, className: 'cmp-gift' },
+                h('span', { className: 'cmp-gift-emoji' }, parcel.emoji),
+                h(
+                  'div',
+                  { className: 'cmp-gift-main' },
+                  h('div', { className: 'cmp-gift-name' }, parcel.name),
+                  h(
+                    'div',
+                    { className: 'cmp-gift-meta' },
+                    `${parcel.from === 'him' ? '你在寄' : '她在买'} · ${
+                      parcel.minutes <= 0
+                        ? '快到了'
+                        : parcel.minutes < 60
+                          ? `${parcel.minutes} 分钟后到`
+                          : `${Math.round(parcel.minutes / 60)} 小时后到`
+                    }`,
+                  ),
+                ),
+              ),
+            );
+          }
+        }
+        body.push(h('div', { className: 'cmp-field' }, `往来 · ${data.gifts.length} 件`));
+        if (!data.gifts.length) {
+          body.push(h('p', { className: 'cmp-hint' }, '还没有互相送过东西。'));
+        }
+        for (const gift of data.gifts) {
+          const ctx = context[gift.seq];
+          body.push(
+            h(
+              'button',
+              {
+                key: gift.seq,
+                type: 'button',
+                className: 'cmp-gift',
+                onClick: () => void toggle(gift),
+              },
+              h('span', { className: 'cmp-gift-emoji' }, gift.emoji),
+              h(
+                'div',
+                { className: 'cmp-gift-main' },
+                h('div', { className: 'cmp-gift-name' }, gift.name),
+                h(
+                  'div',
+                  { className: 'cmp-gift-meta' },
+                  [
+                    gift.from === 'him' ? '你送的' : '她送的',
+                    gift.cost ? `${gift.cost} 元` : '',
+                    dayStamp(gift.ts),
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
+                ),
+              ),
+              h('span', { className: 'cmp-gift-meta' }, open === gift.seq ? '收起' : '当时'),
+            ),
+          );
+          if (open === gift.seq) {
+            body.push(
+              h(
+                'div',
+                { key: `c-${gift.seq}`, className: 'cmp-gift-ctx' },
+                !ctx
+                  ? h('div', { className: 'cmp-ctx-line' }, '正在读…')
+                  : ctx.gone
+                    ? h('div', { className: 'cmp-ctx-line' }, '那段对话已经被清掉了。')
+                    : (ctx.context || []).map((line) =>
+                        h(
+                          'div',
+                          {
+                            key: line.seq,
+                            className: `cmp-ctx-line${line.seq === ctx.focus ? ' focus' : ''}`,
+                          },
+                          h('span', { className: 'cmp-ctx-who' }, line.role === 'user' ? '你' : '她'),
+                          h('span', { className: 'cmp-ctx-body' }, line.text),
+                        ),
+                      ),
+              ),
+            );
+          }
+        }
+      }
+
+      return h(
+        'div',
+        { className: 'cmp-roster' },
+        h(
+          'div',
+          { className: 'cmp-roster-head' },
+          h('button', { type: 'button', className: 'cmp-pill', onClick: onBack }, '← 回去聊天'),
+          h('div', { className: 'cmp-name', style: { fontSize: 16 } }, '物品'),
+        ),
+        ...body,
+        error ? h('div', { className: 'cmp-err' }, error) : null,
+      );
+    }
+
     function RulesPage({ onBack }) {
       const [text, setText] = React.useState(null);
       const [path, setPath] = React.useState('');
@@ -1700,6 +1850,15 @@ window.__ModuleLoader__.load({
         );
       }
 
+      if (view === 'gifts') {
+        return h(
+          'div',
+          { className: 'cmp-root' },
+          h('style', null, CSS),
+          h(GiftsPage, { onBack: () => setView('chat') }),
+        );
+      }
+
       if (view === 'portrait') {
         return h(
           'div',
@@ -1858,6 +2017,7 @@ window.__ModuleLoader__.load({
                 )
               : null,
             trial ? h('div', { className: 'cmp-trial' }, `磨合中 ${trial} 天`) : null,
+            h('button', { type: 'button', className: 'cmp-pill', onClick: () => setView('gifts') }, '物品'),
             h(
               'button',
               {

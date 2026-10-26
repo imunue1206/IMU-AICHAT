@@ -233,7 +233,25 @@ export function apply(ctx) {
     if (!arrived.length) return;
     ch.parcels = ch.parcels.filter((parcel) => parcel.arrivesAt > now);
     for (const parcel of arrived) {
-      pushItem(ch, parcel.from === 'her' ? 'her' : 'user', parcel.name, parcel.emoji, '', parcel.cost);
+      const message = pushItem(
+        ch,
+        parcel.from === 'her' ? 'her' : 'user',
+        parcel.name,
+        parcel.emoji,
+        '',
+        parcel.cost,
+      );
+      // A ledger that outlives the chat window: this is the record he asked for.
+      ch.giftLog = Array.isArray(ch.giftLog) ? ch.giftLog : [];
+      ch.giftLog.push({
+        seq: message.seq,
+        name: parcel.name,
+        emoji: parcel.emoji,
+        from: parcel.from,
+        cost: parcel.cost,
+        ts: now,
+      });
+      if (ch.giftLog.length > 200) ch.giftLog.splice(0, ch.giftLog.length - 200);
       ch.items = Array.isArray(ch.items) ? ch.items : [];
       ch.items.push({
         name: parcel.name,
@@ -1147,6 +1165,45 @@ export function apply(ctx) {
           if (!root.portrait.answers) root.portrait.answers = [];
           persist(true);
           return reply(res, 200, { ok: true, portrait: portraitPayload() });
+        }
+
+        case 'gifts.list': {
+          if (!ch) return reply(res, 404, { ok: false, error: '没有这个人' });
+          return reply(res, 200, {
+            ok: true,
+            gifts: (ch.giftLog || []).slice().reverse(),
+            parcels: (ch.parcels || []).map((parcel) => ({
+              name: parcel.name,
+              emoji: parcel.emoji,
+              from: parcel.from,
+              minutes: Math.max(0, Math.round((parcel.arrivesAt - now) / 60_000)),
+            })),
+          });
+        }
+
+        case 'gifts.context': {
+          if (!ch) return reply(res, 404, { ok: false, error: '没有这个人' });
+          const index = ch.messages.findIndex((message) => message.seq === Number(body.seq));
+          if (index < 0) {
+            return reply(res, 200, { ok: true, context: [], gone: true });
+          }
+          const slice = ch.messages.slice(Math.max(0, index - 3), index + 3);
+          return reply(res, 200, {
+            ok: true,
+            context: slice.map((message) => ({
+              seq: message.seq,
+              role: message.role,
+              kind: message.kind,
+              text:
+                message.kind === 'sticker'
+                  ? message.sticker.text || message.sticker.emoji
+                  : message.kind === 'item'
+                    ? `${message.item.emoji} ${message.item.name}`
+                    : message.text,
+              ts: message.ts,
+            })),
+            focus: Number(body.seq),
+          });
         }
 
         case 'send.item': {
