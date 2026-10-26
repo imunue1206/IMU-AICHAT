@@ -23,7 +23,7 @@ import {
   ITEM_MARK,
 } from './world.js';
 import { weatherFor, seasonOf } from './weather.js';
-import { CITIES, coordsOf, locationOf, roughDistance } from './geo.js';
+import { CITIES, coordsOf, locationOf, roughDistance, distanceFromPoint } from './geo.js';
 import { distanceBetween, describeDistance } from './geo.js';
 import {
   candidatesPrompt,
@@ -179,6 +179,7 @@ export function apply(ctx) {
     if (ch.profile && ch.profile.city) void weatherFor(currentCity(ch));
   }
   if (root.user && root.user.city) void weatherFor(root.user.city);
+  else void locateMe();
 
   const active = () => root.characters.find((ch) => ch.id === root.activeId) || null;
 
@@ -252,6 +253,49 @@ export function apply(ctx) {
   }
 
   const userCity = () => (root.user && root.user.city) || '';
+
+  /** Where the user is: from their IP once, then remembered. */
+  async function locateMe(force = false) {
+    if (!force && root.user && root.user.city) return root.user;
+    try {
+      const response = await fetch(
+        'http://ip-api.com/json/?lang=zh-CN&fields=status,countryCode,city,regionName,lat,lon',
+        { signal: AbortSignal.timeout(4000) },
+      );
+      const data = await response.json();
+      if (data && data.status === 'success' && data.countryCode === 'CN' && data.city) {
+        root.user = {
+          city: String(data.city).slice(0, 20),
+          lat: Number(data.lat),
+          lon: Number(data.lon),
+          auto: true,
+        };
+        persist(true);
+        console.log('[companion] located you at', root.user.city);
+      } else if (data && data.status === 'success' && data.city) {
+        // Outside China: keep the name, coordinates still give a distance.
+        root.user = {
+          city: String(data.city).slice(0, 20),
+          lat: Number(data.lat),
+          lon: Number(data.lon),
+          auto: true,
+        };
+        persist(true);
+      }
+    } catch (error) {
+      console.error('[companion] could not locate you:', String(error?.message || error));
+    }
+    return root.user;
+  }
+
+  /** Distance to her, preferring raw coordinates when we have them. */
+  function distanceTo(ch, now = Date.now()) {
+    const her = currentCity(ch, now);
+    if (root.user && Number.isFinite(root.user.lat) && Number.isFinite(root.user.lon)) {
+      return distanceFromPoint(her, root.user.lat, root.user.lon);
+    }
+    return distanceBetween(her, userCity());
+  }
 
   function sendParcel(ch, from, name, emoji, cost, requested, minutes) {
     const now = Date.now();
@@ -476,7 +520,7 @@ export function apply(ctx) {
         her: weatherFor(currentCity(ch)),
         his: userCity() ? weatherFor(userCity()) : null,
       },
-      distanceKm: distanceBetween(currentCity(ch), userCity()),
+      distanceKm: distanceTo(ch),
       hisCity: userCity(),
     });
     const lastUser = [...ch.messages].reverse().find((message) => message.role === 'user');
@@ -893,6 +937,29 @@ export function apply(ctx) {
 
   function serveAvatar(req, res) {
     const id = String(req.url || '').split('?')[0].split('/').filter(Boolean).pop();
+    if (id === 'me') {
+      const mine = root.user && root.user.avatar;
+      if (!mine) {
+        res.writeHead(404, { 'cache-control': 'no-store' });
+        res.end('no avatar');
+        return;
+      }
+      try {
+        const bytes = fs.readFileSync(path.join(dir, mine.file));
+        const type = mine.file.endsWith('.png')
+          ? 'image/png'
+          : mine.file.endsWith('.webp')
+            ? 'image/webp'
+            : 'image/jpeg';
+        res.writeHead(200, { 'content-type': type, 'cache-control': 'public, max-age=86400' });
+        res.end(bytes);
+        return;
+      } catch {
+        res.writeHead(404, { 'cache-control': 'no-store' });
+        res.end('missing');
+        return;
+      }
+    }
     const ch = root.characters.find((candidate) => candidate.id === id);
     const avatar = ch && ch.profile && ch.profile.avatar;
     if (!avatar) {
@@ -953,6 +1020,13 @@ export function apply(ctx) {
       builtins: BUILTINS.map(({ id, name, blurb, voice }) => ({ id, name, blurb, voice })),
       draft: draftPayload(),
       encounter: profile && profile.encounter ? profile.encounter : null,
+      me: {
+        city: userCity(),
+        cityLabel: userCity() ? locationOf(userCity()) : '',
+        avatar: root.user && root.user.avatar
+          ? `${AVATAR}/me?v=${root.user.avatar.v}`
+          : null,
+      },
       distance: profile
         ? {
             herCity: currentCity(ch),
@@ -960,8 +1034,8 @@ export function apply(ctx) {
             herKnown: Boolean(coordsOf(currentCity(ch))),
             hisCity: userCity(),
             hisPlace: userCity() ? locationOf(userCity()) : '',
-            km: distanceBetween(currentCity(ch), userCity()),
-            kmLabel: roughDistance(distanceBetween(currentCity(ch), userCity())),
+            km: distanceTo(ch, now),
+            kmLabel: roughDistance(distanceTo(ch, now)),
           }
         : null,
       weather: (() => {
@@ -1264,7 +1338,30 @@ export function apply(ctx) {
         }
 
         case 'user.set': {
-          root.user = { city: String(body.city || '').trim().slice(0, 20) };
+          root.user = { ...(root.user || {}), city: String(body.city || '').trim().slice(0, 20) };
+          persist(true);
+          return reply(res, 200, { ok: true, user: root.user });
+        }
+
+        case 'user.locate': {
+          const user = await locateMe(true);
+          return reply(res, 200, { ok: Boolean(user && user.city), user: user || null });
+        }
+
+        case 'user.avatar': {
+          const match = String(body.avatar || '').match(
+            /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/,
+          );
+          if (!match) return reply(res, 400, { ok: false, error: '图片格式不支持' });
+          const buffer = Buffer.from(match[2], 'base64');
+          if (buffer.length > 3 * 1024 * 1024) {
+            return reply(res, 400, { ok: false, error: '头像太大了' });
+          }
+          const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+          const name = `avatar-me.${ext}`;
+          fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(path.join(dir, name), buffer);
+          root.user = { ...(root.user || {}), avatar: { file: name, v: Date.now() } };
           persist(true);
           return reply(res, 200, { ok: true, user: root.user });
         }

@@ -124,6 +124,23 @@ export function coordsOf(name) {
 
 const toRad = (deg) => (deg * Math.PI) / 180;
 
+/** Great-circle distance in km between two coordinate pairs. */
+export function haversine(lat1, lon1, lat2, lon2) {
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return Math.round(2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h))));
+}
+
+/** Distance from a named city to a raw coordinate (used for the user's IP). */
+export function distanceFromPoint(name, lat, lon) {
+  const from = coordsOf(name);
+  if (!from || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return haversine(from[0], from[1], lat, lon);
+}
+
 /** Great-circle distance in km, or null when either city is unknown. */
 export function distanceBetween(a, b) {
   const from = coordsOf(a);
@@ -131,12 +148,7 @@ export function distanceBetween(a, b) {
   if (!from || !to) return null;
   const [lat1, lon1] = from;
   const [lat2, lon2] = to;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return Math.round(2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h))));
+  return haversine(lat1, lon1, lat2, lon2);
 }
 
 /**

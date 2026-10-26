@@ -1057,12 +1057,17 @@ window.__ModuleLoader__.load({
       const [error, setError] = React.useState(null);
       const [status, setStatus] = React.useState('');
       const [city, setCity] = React.useState('');
+      const [myAvatar, setMyAvatar] = React.useState(null);
+      const avatarRef = React.useRef(null);
 
       const load = React.useCallback(async () => {
         try {
           const data = await api('portrait.get');
           setPortrait(data.portrait);
-          if (data.user) setCity(data.user.city || '');
+          if (data.user) {
+            setCity(data.user.city || '');
+            setMyAvatar(data.user.avatar ? `/companion/avatar/me?v=${data.user.avatar.v}` : null);
+          }
           if (data.portrait.status !== 'asking') {
             setSummary((current) => current || data.portrait.summary || '');
           }
@@ -1128,6 +1133,30 @@ window.__ModuleLoader__.load({
           await api('user.set', { city });
           setStatus('城市已保存');
         });
+
+      const locate = () =>
+        run(async () => {
+          const data = await api('user.locate');
+          if (data.ok && data.user) {
+            setCity(data.user.city || '');
+            setStatus('已定位');
+          } else {
+            setError('定位失败，直接填城市也行');
+          }
+        });
+
+      const pickAvatar = async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+          const dataUrl = await squareDataUrl(file);
+          const data = await api('user.avatar', { avatar: dataUrl });
+          setMyAvatar(`/companion/avatar/me?v=${data.user.avatar.v}`);
+          setStatus('头像已更新');
+        } catch (cause) {
+          setError(String(cause?.message || cause));
+        }
+      };
 
       const save = () =>
         run(async () => {
@@ -1276,7 +1305,40 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', className: 'cmp-pill', onClick: onBack }, '← 回去'),
           h('div', { className: 'cmp-name', style: { fontSize: 16 } }, '关于我'),
         ),
-        h('div', { className: 'cmp-field', style: { marginTop: 18 } }, '你在哪个城市'),
+        h(
+          'div',
+          { className: 'cmp-field', style: { marginTop: 18 } },
+          '你的头像',
+        ),
+        h(
+          'div',
+          { className: 'cmp-review-head' },
+          h(
+            'div',
+            { className: 'cmp-avatar-lg', style: { width: 56, height: 56, fontSize: 18 } },
+            myAvatar
+              ? h('img', { src: myAvatar, alt: '' })
+              : '我',
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'cmp-ghost',
+              style: { height: 32, padding: '0 12px' },
+              onClick: () => avatarRef.current && avatarRef.current.click(),
+            },
+            '换一张',
+          ),
+          h('input', {
+            ref: avatarRef,
+            type: 'file',
+            accept: 'image/*',
+            style: { display: 'none' },
+            onChange: pickAvatar,
+          }),
+        ),
+        h('div', { className: 'cmp-field', style: { marginTop: 16 } }, '你在哪个城市'),
         h(
           'div',
           { style: { display: 'flex', gap: 8 } },
@@ -1284,7 +1346,7 @@ window.__ModuleLoader__.load({
             className: 'cmp-input',
             style: { height: 34, minHeight: 34, padding: '6px 10px' },
             value: city,
-            placeholder: '例如 杭州',
+            placeholder: '自动定位，或者手填',
             onChange: (event) => setCity(event.target.value),
           }),
           h(
@@ -1292,7 +1354,18 @@ window.__ModuleLoader__.load({
             {
               type: 'button',
               className: 'cmp-ghost',
-              style: { height: 34, padding: '0 14px' },
+              style: { height: 34, padding: '0 12px' },
+              disabled: busy,
+              onClick: locate,
+            },
+            '定位',
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'cmp-ghost',
+              style: { height: 34, padding: '0 12px' },
               disabled: busy,
               onClick: saveCity,
             },
@@ -1302,7 +1375,7 @@ window.__ModuleLoader__.load({
         h(
           'p',
           { className: 'cmp-hint' },
-          '这个位置决定你和她之间的距离——影响她寄东西要多久、以及她平时怎么跟你说话。',
+          '启动时会按 IP 自动定位一次，只记城市不记地址。填错可以直接改。',
         ),
         ...body,
         error ? h('div', { className: 'cmp-err' }, error) : null,
@@ -1514,6 +1587,8 @@ window.__ModuleLoader__.load({
       const [path, setPath] = React.useState('');
       const [status, setStatus] = React.useState('');
       const [city, setCity] = React.useState('');
+      const [myAvatar, setMyAvatar] = React.useState(null);
+      const avatarRef = React.useRef(null);
       const [error, setError] = React.useState(null);
       const [saving, setSaving] = React.useState(false);
       const [busy, setBusy] = React.useState(false);
@@ -1670,6 +1745,7 @@ window.__ModuleLoader__.load({
       const [parcels, setParcels] = React.useState([]);
       const [weather, setWeather] = React.useState(null);
       const [distance, setDistance] = React.useState(null);
+      const [me, setMe] = React.useState({ city: '', avatar: null });
       const [cityDraft, setCityDraft] = React.useState('');
       const [ready, setReady] = React.useState(false);
       const [view, setView] = React.useState('auto');
@@ -1711,6 +1787,7 @@ window.__ModuleLoader__.load({
         if (Array.isArray(data.parcels)) setParcels(data.parcels);
         if (data.weather !== undefined) setWeather(data.weather);
         if (data.distance !== undefined) setDistance(data.distance);
+        if (data.me !== undefined && data.me) setMe(data.me);
         setTyping(Boolean(data.typing));
         if (data.error !== undefined) setError(data.error);
         if (Array.isArray(data.messages) && data.messages.length) {
@@ -2078,6 +2155,12 @@ window.__ModuleLoader__.load({
                   sticker.text ? h('div', { className: 'cmp-sticker-text' }, sticker.text) : null,
                 )
               : h('div', { className: 'cmp-bubble' }, message.text),
+            mine
+              ? h(Avatar, {
+                  persona: { name: '我', initial: '我', avatar: me.avatar },
+                  small: true,
+                })
+              : null,
           ),
         );
       }
