@@ -43,6 +43,7 @@ import {
   randomBrief,
   meetPrompt,
   pickRole,
+  bondPrompt,
   PORTRAIT_QUESTIONS,
   PORTRAIT_QUICK,
   PORTRAIT_TIERS,
@@ -71,6 +72,7 @@ export function apply(ctx) {
 
   const root = load(dir, file);
   const replying = new Set();
+  const bonding = new Set();
   let authoring = false;
   let lastSave = 0;
   let sawClient = false;
@@ -731,6 +733,40 @@ export function apply(ctx) {
   }
 
   /** After a long quiet stretch she may have something to say on her own. */
+  /** Every ten messages or so, she takes stock of how things stand. */
+  async function reviewBond(ch) {
+    if (bonding.has(ch.id)) return;
+    bonding.add(ch.id);
+    try {
+      const previous = ch.bond || { familiarity: 0.12, warmth: 0.5, trust: 0.08, note: '' };
+      const recent = ch.messages.slice(-40).map(transcriptLine).join('\n');
+      const { system, prompt } = bondPrompt(recent, previous, ch.profile);
+      const result = await completeWithin(system, prompt, [900, 600], 0.4, 'low');
+      const raw = extractJson(result.text);
+      if (!raw || typeof raw !== 'object') return;
+      const clamp = (value, fallback, floor) => {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return fallback;
+        const bounded = Math.min(1, Math.max(floor, n));
+        const delta = bounded - fallback;
+        return fallback + Math.max(-0.15, Math.min(0.15, delta));
+      };
+      ch.bond = {
+        familiarity: clamp(raw.familiarity, previous.familiarity, previous.familiarity),
+        warmth: clamp(raw.warmth, previous.warmth, 0),
+        trust: clamp(raw.trust, previous.trust, 0),
+        note: String(raw.note || '').slice(0, 60),
+        count: ch.messages.length,
+        updatedAt: Date.now(),
+      };
+      persist(true);
+    } catch (error) {
+      console.error('[companion] bond review failed:', String(error?.message || error));
+    } finally {
+      bonding.delete(ch.id);
+    }
+  }
+
   function maybeInitiate(ch, now) {
     if (ch.status !== 'locked' || !profileOf(ch) || !ch.messages.length || ch.meta.pending) return;
     if (now - (ch.meta.lastHerMessageAt || 0) < 6 * 3600_000) return;
@@ -1668,6 +1704,8 @@ export function apply(ctx) {
         deliverParcels(character, now);
         void pump(character);
         maybeInitiate(character, now);
+        const seen = (character.bond && character.bond.count) || 0;
+        if (character.messages.length - seen >= 10) void reviewBond(character);
       }
       persist();
     }, TICK_MS);

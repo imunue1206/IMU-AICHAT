@@ -38,6 +38,7 @@ export function createCharacter(profile, now = Date.now()) {
     seq: 0,
     clock: { lastTick: now },
     life: { cash: profile && profile.cash ? profile.cash : 0, energy: 72, mood: 6 },
+    bond: { familiarity: 0.12, warmth: 0.5, trust: 0.08, note: '', count: 0, updatedAt: 0 },
     events: [],
     ledger: [],
     messages: [],
@@ -117,6 +118,43 @@ const TRAVEL_KINDS = [
   { id: 'trip', label: '出去玩', where: '民宿', words: ['民宿的床太软了', '在街上乱走，走到脚疼'] },
 ];
 
+const BOND_BASELINE = 0.45;
+
+/** What the three numbers mean in words. Never shown as numbers. */
+export function bondLine(state) {
+  const bond = state && state.bond;
+  if (!bond) return '';
+  const warmth =
+    bond.warmth >= 0.7
+      ? '你现在跟他说话很放松'
+      : bond.warmth >= 0.45
+        ? '你们聊得还算自然'
+        : '你现在回他回得比较客气，有点收着';
+  const trust =
+    bond.trust >= 0.6
+      ? '有些事你愿意跟他讲'
+      : bond.trust >= 0.3
+        ? '你还没打算跟他讲自己的事'
+        : '你不会跟他讲自己的事，他也没问过';
+  const familiarity =
+    bond.familiarity >= 0.6
+      ? '你们之间已经有了一些只有你们懂的梗'
+      : bond.familiarity >= 0.3
+        ? '你们聊过几次，还算不上熟'
+        : '你们还很不熟';
+  return `【你们现在】${warmth}；${trust}；${familiarity}。${bond.note ? `（${bond.note}）` : ''}`;
+}
+
+/** Absence cools things: warmth drifts back toward the baseline each day. */
+function maybeDecayBond(state, ts) {
+  const day = new Date(ts).toDateString();
+  if (!state.meta) return;
+  if (state.meta.lastBondDay === day) return;
+  state.meta.lastBondDay = day;
+  if (!state.bond) return;
+  state.bond.warmth = BOND_BASELINE + (state.bond.warmth - BOND_BASELINE) * 0.85;
+}
+
 /** The city she is actually in right now, trip included. */
 export function currentCity(state, now = Date.now()) {
   const trip = state && state.travel;
@@ -186,7 +224,10 @@ export function seasonEventFor(season, minutesAgo = 0) {
 
 function onSlotStart(state, ts, entry, previous) {
   const profile = profileOf(state);
-  if (profile) maybeTravel(state, ts);
+  if (profile) {
+    maybeTravel(state, ts);
+    maybeDecayBond(state, ts);
+  }
   if (previous && previous.earn) {
     state.life.cash += previous.earn;
     pushLedger(state, ts, previous.earn, previous.doing);
@@ -397,7 +438,8 @@ export function planReply(state, now = Date.now(), text = '') {
   if (entry.kind === 'busy') {
     return { reply: true, delay: rand(35_000, 150_000), excuse: 'busy' };
   }
-  return { reply: true, delay: rand(5_000, 30_000), excuse: 'free' };
+  const warmth = state.bond ? state.bond.warmth : 0.5;
+  return { reply: true, delay: rand(5_000, 30_000) * (1.3 - 0.5 * warmth), excuse: 'free' };
 }
 
 export function excuseText(excuse) {
@@ -538,6 +580,7 @@ export function buildSystem(state, now = Date.now(), options = {}) {
     `【你和对方】${known}你们在网上认识，聊得来，但还没到非聊不可的地步。你有你的日子。`,
     overrides.relation ? overrides.relation : relationLine(state),
     overrides.relation ? '' : relationUser(state),
+    bondLine(state),
     portrait ? '【关于他】' : '',
     portrait,
     '',
