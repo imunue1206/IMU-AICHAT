@@ -8,7 +8,7 @@
 
 import { DEFAULT_PROFILE } from './character.js';
 import { describeDistance } from './geo.js';
-import { weatherFor } from './weather.js';
+import { weatherFor, seasonOf } from './weather.js';
 
 const MINUTE = 60_000;
 const DAY = 86_400_000;
@@ -104,6 +104,13 @@ function pushLedger(state, ts, amount, note) {
   if (state.ledger.length > 120) state.ledger.splice(0, state.ledger.length - 120);
 }
 
+const SEASON_EVENTS = {
+  春: ['风里有股土味', '柳絮飘得到处都是', '路边有人开始穿短袖了'],
+  夏: ['空调开了一整夜', '出门五分钟就一身汗', '冰的喝多了胃疼'],
+  秋: ['天黑得越来越早了', '路边在卖烤红薯', '风一吹，落叶哗哗响', '换了床厚一点的被子'],
+  冬: ['手一直插在口袋里', '屋里暖气还没来', '四点多天就黑了'],
+};
+
 const WEATHER_EVENTS = {
   rain: ['出门忘带伞，跑回来拿', '裤脚湿了半截', '雨停了一会儿又下起来'],
   cold: ['今天加了件外套，还是冷', '手冻得握不住手机', '风一吹，脖子缩进衣领里'],
@@ -127,6 +134,14 @@ export function weatherEventFor(weather, minutesAgo = 0) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+/** Once in a while the season leaves a trace, independent of the forecast. */
+export function seasonEventFor(season, minutesAgo = 0) {
+  if (!season || minutesAgo > 20) return '';
+  const pool = SEASON_EVENTS[season];
+  if (!pool || Math.random() > 0.16) return '';
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function onSlotStart(state, ts, entry, previous) {
   const profile = profileOf(state);
   if (previous && previous.earn) {
@@ -147,8 +162,11 @@ function onSlotStart(state, ts, entry, previous) {
     pushEvent(state, ts, pick(profile.interludes));
   }
   if (profile && profile.city) {
-    const line = weatherEventFor(weatherFor(profile.city), (Date.now() - ts) / 60_000);
-    if (line) pushEvent(state, ts, line);
+    const minutesAgo = (Date.now() - ts) / 60_000;
+    const weather = weatherEventFor(weatherFor(profile.city), minutesAgo);
+    if (weather) pushEvent(state, ts, weather);
+    const season = seasonEventFor(seasonOf(new Date()), minutesAgo);
+    if (season) pushEvent(state, ts, season);
   }
 }
 
@@ -452,6 +470,7 @@ export function buildSystem(state, now = Date.now(), options = {}) {
     '',
     distanceLine(profile, distanceKm, hisCity),
     weatherLine(profile, weather),
+    `【时令】现在是 ${new Date(now).getMonth() + 1} 月，${seasonOf(new Date(now))}。`,
     state.profile.encounter
       ? `【你们怎么认识的】${state.profile.encounter.when}，${state.profile.encounter.where}。${state.profile.encounter.moment}`
       : '',

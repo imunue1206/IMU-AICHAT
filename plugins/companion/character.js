@@ -481,6 +481,7 @@ export function meetPrompt(brief, role, context = {}) {
       '"weekend":[同上],"interludes":["日常小插曲"],',
       '"encounter":{"where":"具体地点","when":"什么时候","moment":"当时发生了什么，一句","look":"她当时的样子"}}',
       '',
+      seasonContext(),
       '关于 encounter，这是整件事的重点：',
       '- 只写一个瞬间，不要写完整故事，不要写后续。',
       '- moment 是一句具体的、能被看见的事，30 字内。不要写「聊了几句」「相视一笑」这种。',
@@ -568,6 +569,24 @@ export const labelOf = (list, id) => {
   return hit ? hit.label : '';
 };
 
+/** What month it is, so a person is written wearing the right clothes. */
+export function seasonContext(date = new Date()) {
+  const month = date.getMonth() + 1;
+  const window =
+    month <= 2 || month === 12
+      ? '冬天，冷，要穿厚外套'
+      : month <= 4
+        ? '春天，早晚还凉'
+        : month <= 6
+          ? '初夏，开始热了'
+          : month <= 8
+            ? '盛夏，很热'
+            : month <= 10
+              ? '秋天，早晚温差大'
+              : '深秋，天冷下来';
+  return `现在是 ${month} 月，${window}。她的衣服、作息和吃的东西要符合这个时令。`;
+}
+
 const modeHint = (id) => {
   const hit = RELATION_MODES.find((entry) => entry.id === id);
   return hit ? hit.hint : '';
@@ -622,6 +641,7 @@ export function candidatesPrompt(seed, lifestyle, context = {}) {
       '禁止写：「温柔」「慢热」「外冷内热」「有故事」「不太爱说话」这类标签。标签不算描述。',
       '写她做的一件事、穿的一件衣服、身上的一个细节。三个候选人的差别要看得出来。',
       '',
+      seasonContext(),
       '这次最重要的一条：用户说清了自己的处境，也选了他想要的「关系姿态」。',
       '「关系姿态」是硬约束。描述里别的偏好如果和它冲突，一律以关系姿态为准。',
       '三个人都必须贴合这种姿态，差别只在脾气、节奏、长相上。',
@@ -656,6 +676,7 @@ export function expandPrompt(seed, candidate, lifestyle, context = {}) {
       '"weekday":[["07:30","08:10","做什么","在哪","sleep|busy|free|rest",花费或0,"一句细节"]],',
       '"weekend":[同上],"interludes":["日常小插曲"]}',
       '作息必须用上面的紧凑数组，不要写成带字段名的对象，这样省一半长度、不容易被截断。',
+      seasonContext(),
       '作息规则：',
       '- weekday 和 weekend 各自覆盖 00:00 到 24:00，首尾相接，不重叠，用 "HH:MM"，结束可以写 "24:00"。',
       '- 每段是六个值的数组：[开始, 结束, 做什么, 在哪, kind, 花费]，可选第七个是细节。kind 只能是 sleep/busy/free/rest。',
