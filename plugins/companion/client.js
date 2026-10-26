@@ -213,6 +213,7 @@ window.__ModuleLoader__.load({
   padding:12px 18px;border:none;border-bottom:1px solid var(--dsw-alias-border-l1);
   background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:left}
 .cmp-conv:hover{background:var(--dsw-alias-bg-layer-1)}
+.cmp-me{border-bottom:1px solid var(--dsw-alias-border-l2)}
 .cmp-conv.on{background:var(--dsw-alias-bg-layer-2)}
 .cmp-conv-main{flex:1 1 auto;min-width:0}
 .cmp-conv-top{display:flex;align-items:baseline;gap:8px}
@@ -1382,7 +1383,7 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function Conversations({ roster, onOpen, onMore, onNew, onMeet, onPortrait, busy }) {
+    function Conversations({ roster, me, onOpen, onMore, onNew, onMeet, onPortrait, busy }) {
       return h(
         'div',
         { className: 'cmp-root' },
@@ -1399,8 +1400,32 @@ window.__ModuleLoader__.load({
               { type: 'button', className: 'cmp-primary', style: { height: 30, padding: '0 14px', fontSize: 12.5 }, disabled: busy, onClick: onMeet },
               busy ? '正在遇见…' : '遇见一个人',
             ),
-            h('button', { type: 'button', className: 'cmp-pill', onClick: onPortrait }, '关于我'),
+
             h('button', { type: 'button', className: 'cmp-pill', onClick: onMore }, '管理'),
+          ),
+        ),
+        h(
+          'button',
+          { type: 'button', className: 'cmp-conv cmp-me', onClick: onPortrait },
+          h(Avatar, {
+            persona: { name: '我', initial: '我', avatar: me ? me.avatar : null },
+          }),
+          h(
+            'div',
+            { className: 'cmp-conv-main' },
+            h(
+              'div',
+              { className: 'cmp-conv-top' },
+              h('span', { className: 'cmp-conv-name' }, '我'),
+              h('span', { className: 'cmp-conv-time' }, '关于我'),
+            ),
+            h(
+              'div',
+              { className: 'cmp-conv-preview' },
+              me && me.cityLabel
+                ? `${me.cityLabel} · 头像、画像、语气规则、你在哪`
+                : '头像、画像、语气规则、你在哪',
+            ),
           ),
         ),
         roster.length === 0
@@ -2070,6 +2095,7 @@ window.__ModuleLoader__.load({
       if (shown === 'list') {
         return h(Conversations, {
           roster,
+          me,
           busy: busyId === 'meet',
           onOpen: (entry) => (entry.active ? setView('chat') : act('switch', entry.id)),
           onMore: () => setView('roster'),
