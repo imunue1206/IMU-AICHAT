@@ -780,6 +780,7 @@ export function apply(ctx) {
         unread,
         city: status.city,
         cityLabel: status.cityLabel,
+        online: !status.asleep && Boolean(profileOf(ch)),
         travel: status.travel ? status.travel.kind : '',
         activity: status.status,
         asleep: status.asleep,
