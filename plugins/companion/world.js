@@ -8,6 +8,7 @@
 
 import { DEFAULT_PROFILE } from './character.js';
 import { describeDistance } from './geo.js';
+import { weatherFor } from './weather.js';
 
 const MINUTE = 60_000;
 const DAY = 86_400_000;
@@ -103,6 +104,29 @@ function pushLedger(state, ts, amount, note) {
   if (state.ledger.length > 120) state.ledger.splice(0, state.ledger.length - 120);
 }
 
+const WEATHER_EVENTS = {
+  rain: ['出门忘带伞，跑回来拿', '裤脚湿了半截', '雨停了一会儿又下起来'],
+  cold: ['今天加了件外套，还是冷', '手冻得握不住手机', '风一吹，脖子缩进衣领里'],
+  hot: ['走两步就一身汗', '买了杯冰的，一口气喝掉一半', '太阳晒得头皮发烫'],
+  fog: ['早上雾很大，看不清路'],
+};
+
+/**
+ * A weather-flavoured line, but only for events that are happening now.
+ * Catching up on yesterday must not invent yesterday's rain.
+ */
+export function weatherEventFor(weather, minutesAgo = 0) {
+  if (!weather || minutesAgo > 20) return '';
+  const text = String(weather.text || '');
+  let pool = null;
+  if (/雨/.test(text)) pool = WEATHER_EVENTS.rain;
+  else if (weather.temp <= 4) pool = WEATHER_EVENTS.cold;
+  else if (weather.temp >= 32) pool = WEATHER_EVENTS.hot;
+  else if (/雾/.test(text)) pool = WEATHER_EVENTS.fog;
+  if (!pool || Math.random() > 0.28) return '';
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function onSlotStart(state, ts, entry, previous) {
   const profile = profileOf(state);
   if (previous && previous.earn) {
@@ -121,6 +145,10 @@ function onSlotStart(state, ts, entry, previous) {
   if (entry.note) pushEvent(state, ts, entry.note);
   else if (profile && profile.interludes.length && entry.kind !== 'sleep' && Math.random() < 0.5) {
     pushEvent(state, ts, pick(profile.interludes));
+  }
+  if (profile && profile.city) {
+    const line = weatherEventFor(weatherFor(profile.city), (Date.now() - ts) / 60_000);
+    if (line) pushEvent(state, ts, line);
   }
 }
 
