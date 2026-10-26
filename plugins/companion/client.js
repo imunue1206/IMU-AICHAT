@@ -1853,8 +1853,6 @@ window.__ModuleLoader__.load({
           } else if (action === 'city') {
             absorb(await api('profile.city', { city: id }), true);
             setCityDraft('');
-          } else if (action === 'travel') {
-            absorb(await api('travel.toggle'), true);
           } else if (action === 'meet') {
             const data = await api('characters.meet');
             absorb(data, true);
@@ -2198,7 +2196,7 @@ window.__ModuleLoader__.load({
                   '她此刻在做什么、今天经历了什么，除非她说，你不会知道。',
                 ),
               ),
-              distance && distance.km === null
+              distance && distance.herKnown === false
                 ? h(
                     'div',
                     { style: { marginTop: 10 } },
@@ -2225,16 +2223,6 @@ window.__ModuleLoader__.load({
                     ),
                   )
                 : null,
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'cmp-mini',
-                  style: { marginTop: 10 },
-                  onClick: () => act('travel'),
-                },
-                status && status.travel ? '让她回来' : '让她出趟门',
-              ),
             )
           : null,
         h(

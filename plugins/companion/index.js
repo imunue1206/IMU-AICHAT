@@ -23,7 +23,7 @@ import {
   ITEM_MARK,
 } from './world.js';
 import { weatherFor, seasonOf } from './weather.js';
-import { CITIES, locationOf, roughDistance } from './geo.js';
+import { CITIES, coordsOf, locationOf, roughDistance } from './geo.js';
 import { distanceBetween, describeDistance } from './geo.js';
 import {
   candidatesPrompt,
@@ -957,6 +957,7 @@ export function apply(ctx) {
         ? {
             herCity: currentCity(ch),
             herPlace: locationOf(currentCity(ch)),
+            herKnown: Boolean(coordsOf(currentCity(ch))),
             hisCity: userCity(),
             hisPlace: userCity() ? locationOf(userCity()) : '',
             km: distanceBetween(currentCity(ch), userCity()),
@@ -1258,25 +1259,6 @@ export function apply(ctx) {
             return reply(res, 400, { ok: false, error: `不认识的城：${city}。试试杭州、成都、武汉这种。` });
           }
           target.profile.city = city;
-          persist(true);
-          return reply(res, 200, payload(0, now));
-        }
-
-        case 'travel.toggle': {
-          if (!ch || !profileOf(ch)) return reply(res, 400, { ok: false, error: '先有一个人' });
-          if (ch.travel) {
-            ch.travel = null;
-            return reply(res, 200, payload(0, now));
-          }
-          const home = ch.profile.city;
-          const options = CITIES.filter((city) => city !== home);
-          const kinds = ['work', 'home', 'trip'];
-          ch.travel = {
-            kind: kinds[Math.floor(Math.random() * kinds.length)],
-            city: options[Math.floor(Math.random() * options.length)] || home,
-            startedAt: now,
-            endsAt: now + (1 + Math.floor(Math.random() * 3)) * 86400000,
-          };
           persist(true);
           return reply(res, 200, payload(0, now));
         }
