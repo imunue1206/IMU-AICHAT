@@ -23,7 +23,7 @@ import {
   ITEM_MARK,
 } from './world.js';
 import { weatherFor, seasonOf } from './weather.js';
-import { CITIES } from './geo.js';
+import { CITIES, locationOf, roughDistance } from './geo.js';
 import { distanceBetween, describeDistance } from './geo.js';
 import {
   candidatesPrompt,
@@ -735,6 +735,7 @@ export function apply(ctx) {
         lastMine: last ? last.role === 'user' : false,
         unread,
         city: status.city,
+        cityLabel: status.cityLabel,
         travel: status.travel ? status.travel.kind : '',
         activity: status.status,
         asleep: status.asleep,
@@ -955,8 +956,11 @@ export function apply(ctx) {
       distance: profile
         ? {
             herCity: currentCity(ch),
+            herPlace: locationOf(currentCity(ch)),
             hisCity: userCity(),
+            hisPlace: userCity() ? locationOf(userCity()) : '',
             km: distanceBetween(currentCity(ch), userCity()),
+            kmLabel: roughDistance(distanceBetween(currentCity(ch), userCity())),
           }
         : null,
       weather: (() => {

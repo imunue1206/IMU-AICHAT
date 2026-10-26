@@ -50,6 +50,67 @@ const CITY_COORDS = {
 
 export const CITIES = Object.keys(CITY_COORDS);
 
+const PROVINCES = {
+  北京: '北京',
+  上海: '上海',
+  天津: '天津',
+  重庆: '重庆',
+  广州: '广东',
+  深圳: '广东',
+  佛山: '广东',
+  东莞: '广东',
+  珠海: '广东',
+  杭州: '浙江',
+  宁波: '浙江',
+  温州: '浙江',
+  南京: '江苏',
+  苏州: '江苏',
+  无锡: '江苏',
+  常州: '江苏',
+  成都: '四川',
+  武汉: '湖北',
+  西安: '陕西',
+  长沙: '湖南',
+  郑州: '河南',
+  青岛: '山东',
+  济南: '山东',
+  沈阳: '辽宁',
+  大连: '辽宁',
+  厦门: '福建',
+  福州: '福建',
+  合肥: '安徽',
+  昆明: '云南',
+  哈尔滨: '黑龙江',
+  长春: '吉林',
+  石家庄: '河北',
+  太原: '山西',
+  南昌: '江西',
+  南宁: '广西',
+  贵阳: '贵州',
+  兰州: '甘肃',
+  乌鲁木齐: '新疆',
+  海口: '海南',
+  三亚: '海南',
+};
+
+/** "浙江 杭州"; municipalities stay as one word. */
+export function locationOf(name) {
+  const city = normalise(name);
+  if (!city) return '';
+  const province = PROVINCES[city];
+  if (!province || province === city) return city;
+  return `${province} ${city}`;
+}
+
+/** A distance a person would actually say out loud. */
+export function roughDistance(km) {
+  if (km === null || km === undefined) return '';
+  if (km < 80) return '同城';
+  if (km < 200) return `约 ${Math.round(km / 10) * 10} 公里`;
+  if (km < 1000) return `约 ${Math.round(km / 50) * 50} 公里`;
+  return `约 ${Math.round(km / 100) * 100} 公里`;
+}
+
 /** Strip a trailing 市/省 so "杭州市" still resolves. */
 function normalise(name) {
   return String(name || '')

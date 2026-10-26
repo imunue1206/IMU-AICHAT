@@ -7,7 +7,7 @@
  */
 
 import { DEFAULT_PROFILE } from './character.js';
-import { describeDistance, CITIES } from './geo.js';
+import { describeDistance, CITIES, locationOf } from './geo.js';
 import { weatherFor, seasonOf } from './weather.js';
 
 const MINUTE = 60_000;
@@ -298,7 +298,14 @@ export function describe(state, now = Date.now()) {
     activity: entry.doing,
     place: trip ? trip.where : entry.where,
     city: travelling ? travelling.city : profile.city,
-    travel: travelling ? { kind: trip ? trip.label : '出门', city: travelling.city } : null,
+    cityLabel: locationOf(travelling ? travelling.city : profile.city),
+    travel: travelling
+      ? {
+          kind: trip ? trip.label : '出门',
+          city: travelling.city,
+          label: locationOf(travelling.city),
+        }
+      : null,
     status: `${entry.doing} · ${entry.where}`,
     energy: Math.round(state.life.energy),
     energyLabel: energyLabel(state.life.energy),

@@ -912,7 +912,7 @@ window.__ModuleLoader__.load({
                     h(
                       'div',
                       { className: 'cmp-sub' },
-                      entry.met ? entry.city : entry.identity,
+                      entry.met ? entry.cityLabel : entry.identity,
                     ),
                     h(
                       'div',
@@ -1363,7 +1363,7 @@ window.__ModuleLoader__.load({
                         ? '已停用'
                         : entry.lastText
                           ? `${entry.lastMine ? '我：' : ''}${entry.lastText}`
-                          : entry.city || '还没说过话',
+                          : entry.cityLabel || '还没说过话',
                     ),
                   ),
                   entry.unread
@@ -2107,14 +2107,18 @@ window.__ModuleLoader__.load({
               { className: 'cmp-name' },
               persona.name,
               status && status.travel
-                ? h('span', { className: 'cmp-place' }, `${status.travel.kind} · ${status.travel.city}`)
-                : distance && distance.herCity
+                ? h(
+                    'span',
+                    { className: 'cmp-place' },
+                    `${status.travel.kind} · ${status.travel.label}`,
+                  )
+                : distance && distance.herPlace
                   ? h(
                       'span',
                       { className: 'cmp-place' },
-                      distance.km !== null && distance.km !== undefined
-                        ? `${distance.herCity} · 距你 ${distance.km} 公里`
-                        : distance.herCity,
+                      [distance.herPlace, distance.kmLabel ? `距你${distance.kmLabel}` : '']
+                        .filter(Boolean)
+                        .join(' · '),
                     )
                   : null,
             ),
@@ -2172,10 +2176,10 @@ window.__ModuleLoader__.load({
                 'div',
                 { className: 'cmp-life-now' },
                 [
-                  status.travel ? `${status.travel.kind} · ${status.travel.city}` : status.city,
-                  distance && distance.km !== null && distance.km !== undefined
-                    ? `距你 ${distance.km} 公里`
-                    : '',
+                  status.travel
+                    ? `${status.travel.kind} · ${status.travel.label}`
+                    : status.cityLabel,
+                  distance && distance.kmLabel ? `距你${distance.kmLabel}` : '',
                   weather && weather.her ? `${weather.her.temp}°C ${weather.her.text}` : '',
                 ]
                   .filter(Boolean)
