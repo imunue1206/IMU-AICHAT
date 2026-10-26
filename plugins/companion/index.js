@@ -430,7 +430,9 @@ export function apply(ctx) {
           ? '（对方什么也没说）'
           : lastUser.kind === 'sticker'
             ? `（他发了个表情包：${lastUser.sticker.text || ''} ${lastUser.sticker.emoji}）`
-            : lastUser.text;
+            : lastUser.kind === 'item'
+              ? `（他寄的东西到了：${lastUser.item.emoji} ${lastUser.item.name}）`
+              : lastUser.text;
     const { text } = await complete(system, prompt, 700, 0.95);
     return sanitize(text);
   }
@@ -1211,15 +1213,9 @@ export function apply(ctx) {
           const name = String(body.name || '').trim().slice(0, 16);
           if (!name) return reply(res, 400, { ok: false, error: '没有东西' });
           const emoji = String(body.emoji || '🎁').slice(0, 4);
+          // Sending is private: it must not touch the conversation at all.
+          // She only learns about it when the parcel arrives.
           sendParcel(ch, 'him', name, emoji, 0);
-          const plan = planReply(ch, now, name);
-          ch.meta.pending = {
-            kind: 'reply',
-            dueAt: now + Math.min(plan.delay, 90_000),
-            userAt: now,
-            excuse: plan.excuse,
-          };
-          ch.meta.skipStreak = 0;
           persist(true);
           return reply(res, 200, payload(Number(body.since) || 0, now));
         }
